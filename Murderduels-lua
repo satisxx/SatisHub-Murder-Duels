@@ -1,60 +1,77 @@
--- SATISHUB 67 | MURDER DUELS | V3.1
--- Black & Gold / 67 Brainrot-style UI
--- RightShift: show / hide | Aimbot: automatic while ON (no RMB needed)
--- Client-side prototype. Server rules and custom cameras may override changes.
--- To show the 67 photo, upload the supplied PNG to Roblox and enter its asset ID,
--- or put the PNG in the executor workspace if getcustomasset is supported.
+-- SATISHUB | MURDER DUELS | V4.1
+-- Meliodas-style Black & Gold UI
+-- RightShift = show/hide | Auto Execute on Teleport = always ON
+-- To show the Meliodas background in the menu:
+-- 1) Upload your image to Roblox and set BACKGROUND_ASSET_ID.
+-- 2) Or place a local file named SatisHub_Meliodas_background.png if your executor supports getcustomasset/getsynasset.
+-- Note: this is a client-side UI prototype; some features can still be affected by the game's camera or server-side rules.
 
 if not game:IsLoaded() then game.Loaded:Wait() end
+
 local Players = game:GetService('Players')
 local UIS = game:GetService('UserInputService')
 local RunService = game:GetService('RunService')
-local HttpService = game:GetService('HttpService')
 local TweenService = game:GetService('TweenService')
+local HttpService = game:GetService('HttpService')
+
 local LP = Players.LocalPlayer
 if not LP then return end
 local PG = LP:WaitForChild('PlayerGui')
 local env = (type(getgenv) == 'function' and getgenv()) or _G
-if type(env.SatisHub67Cleanup) == 'function' then pcall(env.SatisHub67Cleanup) end
+if type(env.SatisHubMeliodasCleanup) == 'function' then pcall(env.SatisHubMeliodasCleanup) end
 
 local RAW_URL = 'https://raw.githubusercontent.com/satisxx/SatisHub-Murder-Duels/main/Murderduels-lua'
-local BACKGROUND_ASSET_ID = '0' -- Replace with an uploaded Roblox image asset ID
-local BACKGROUND_FILE = 'SatisHub_67_background.png' -- Optional local executor workspace file
-local SETTINGS_FILE = 'SatisHub67_Config.json'
+local BACKGROUND_ASSET_ID = '0' -- put your uploaded Meliodas image asset id here
+local BACKGROUND_FILE = 'SatisHub_Meliodas_background.png'
+local SETTINGS_FILE = 'SatisHub_Meliodas_Config.json'
+
 local GOLD = Color3.fromRGB(255, 194, 45)
-local PALE = Color3.fromRGB(255, 230, 165)
-local WHITE = Color3.fromRGB(247, 244, 233)
-local MUTED = Color3.fromRGB(164, 156, 137)
+local PALE = Color3.fromRGB(255, 232, 174)
+local WHITE = Color3.fromRGB(246, 243, 234)
+local MUTED = Color3.fromRGB(169, 159, 139)
 local BG = Color3.fromRGB(8, 9, 11)
-local PANEL = Color3.fromRGB(15, 15, 17)
-local PANEL2 = Color3.fromRGB(27, 25, 23)
-local GREEN = Color3.fromRGB(86, 229, 128)
-local RED = Color3.fromRGB(233, 107, 96)
+local PANEL = Color3.fromRGB(14, 14, 17)
+local PANEL2 = Color3.fromRGB(25, 22, 18)
+local GREEN = Color3.fromRGB(97, 228, 145)
+local RED = Color3.fromRGB(230, 106, 97)
 
 local defaults = {
-    aim = false, fov = 200, smooth = 0.25, aimPart = 'Head',
-    wall = true, team = true, circle = true, esp = false,
-    noclip = false, autoTeleport = true, aimMethod = 'Camera',
+    aim = false,
+    longRange = true,
+    fov = 200,
+    smooth = 0.25,
+    aimPart = 'Head',
+    wall = true,
+    team = true,
+    circle = true,
+    esp = false,
+    noclip = false,
+    autoTeleport = true,
+    aimMethod = 'Camera',
 }
-local cfg = {}
-for k, v in pairs(defaults) do cfg[k] = v end
 
--- Load locally saved settings (when executor file APIs are available).
+local cfg = {}
+for k, v in pairs(defaults) do
+    cfg[k] = v
+end
+
 local function merge(from)
     if type(from) ~= 'table' then return end
-    for k, default in pairs(defaults) do
-        if type(from[k]) == type(default) then cfg[k] = from[k] end
+    for k, defaultValue in pairs(defaults) do
+        if type(from[k]) == type(defaultValue) then
+            cfg[k] = from[k]
+        end
     end
 end
+
 if type(readfile) == 'function' then
     pcall(function()
-        local serialized = readfile(SETTINGS_FILE)
-        merge(HttpService:JSONDecode(serialized))
+        local raw = readfile(SETTINGS_FILE)
+        merge(HttpService:JSONDecode(raw))
     end)
 end
-merge(env.SatisHub67Seed)
-env.SatisHub67Seed = nil
--- Mandatory setting: old saved configurations cannot disable it.
+merge(env.SatisHubMeliodasSeed)
+env.SatisHubMeliodasSeed = nil
 cfg.autoTeleport = true
 cfg.fov = math.clamp(cfg.fov, 30, 550)
 cfg.smooth = math.clamp(cfg.smooth, 0.05, 1)
@@ -62,25 +79,36 @@ if cfg.aimPart ~= 'Head' and cfg.aimPart ~= 'HumanoidRootPart' then cfg.aimPart 
 if cfg.aimMethod ~= 'Camera' and cfg.aimMethod ~= 'Mouse' then cfg.aimMethod = 'Camera' end
 
 local function saveSettings()
-    env.SatisHub67Current = cfg
+    cfg.autoTeleport = true
+    env.SatisHubMeliodasCurrent = cfg
     if type(writefile) == 'function' then
-        pcall(function() writefile(SETTINGS_FILE, HttpService:JSONEncode(cfg)) end)
+        pcall(function()
+            writefile(SETTINGS_FILE, HttpService:JSONEncode(cfg))
+        end)
     end
 end
+
 local connections, highlights, original = {}, {}, {}
-local alive, dragging = true, false
-local lastTarget, lastDistance = nil, nil
+local alive = true
+local dragging = false
+local currentPage = nil
+local lastTarget = nil
+local lastDistance = nil
+local teleportQueued = false
+
 local function bind(signal, fn)
     local c = signal:Connect(fn)
     table.insert(connections, c)
     return c
 end
+
 local function rounded(object, radius)
-    local v = Instance.new('UICorner')
-    v.CornerRadius = UDim.new(0, radius)
-    v.Parent = object
-    return v
+    local c = Instance.new('UICorner')
+    c.CornerRadius = UDim.new(0, radius)
+    c.Parent = object
+    return c
 end
+
 local function outline(object, color, thickness, transparency)
     local s = Instance.new('UIStroke')
     s.Color = color or GOLD
@@ -89,33 +117,37 @@ local function outline(object, color, thickness, transparency)
     s.Parent = object
     return s
 end
-local function box(parent, x, y, w, h, color, z, transparency)
+
+local function frame(parent, x, y, w, h, color, z, transparency)
     local f = Instance.new('Frame')
     f.BorderSizePixel = 0
     f.Position = UDim2.fromOffset(x, y)
     f.Size = UDim2.fromOffset(w, h)
     f.BackgroundColor3 = color or PANEL
     f.BackgroundTransparency = transparency or 0
-    f.ZIndex = z or 4
+    f.ZIndex = z or 5
     f.Parent = parent
     return f
 end
-local function text(parent, value, x, y, w, h, size, color, font, z)
+
+local function label(parent, value, x, y, w, h, size, color, font, z)
     local t = Instance.new('TextLabel')
     t.BackgroundTransparency = 1
     t.BorderSizePixel = 0
     t.Position = UDim2.fromOffset(x, y)
     t.Size = UDim2.fromOffset(w, h)
     t.Font = font or Enum.Font.Gotham
-    t.TextColor3 = color or WHITE
     t.Text = value
+    t.TextColor3 = color or WHITE
     t.TextSize = size or 13
     t.TextXAlignment = Enum.TextXAlignment.Left
-    t.ZIndex = z or 7
+    t.TextYAlignment = Enum.TextYAlignment.Center
+    t.ZIndex = z or 8
     t.Parent = parent
     return t
 end
-local function button(parent, value, x, y, w, h, fn)
+
+local function makeButton(parent, value, x, y, w, h, fn)
     local b = Instance.new('TextButton')
     b.BorderSizePixel = 0
     b.BackgroundColor3 = PANEL2
@@ -125,143 +157,238 @@ local function button(parent, value, x, y, w, h, fn)
     b.TextSize = 12
     b.Font = Enum.Font.GothamBold
     b.TextColor3 = WHITE
-    b.ZIndex = 9
     b.AutoButtonColor = false
+    b.ZIndex = 9
     b.Parent = parent
     rounded(b, 9)
     outline(b, Color3.fromRGB(95, 73, 32), 1, 0.25)
     bind(b.MouseEnter, function()
-        TweenService:Create(b, TweenInfo.new(0.12), {BackgroundColor3 = Color3.fromRGB(55, 43, 20)}):Play()
+        TweenService:Create(b, TweenInfo.new(0.12), {BackgroundColor3 = Color3.fromRGB(57, 41, 15)}):Play()
     end)
     bind(b.MouseLeave, function()
         TweenService:Create(b, TweenInfo.new(0.12), {BackgroundColor3 = b:GetAttribute('RestColor') or PANEL2}):Play()
     end)
-    bind(b.MouseButton1Click, function() fn(b) end)
+    bind(b.MouseButton1Click, function()
+        if fn then fn(b) end
+    end)
     return b
 end
 
 local gui = Instance.new('ScreenGui')
-gui.Name = 'SatisHub67_V3'
+gui.Name = 'SatisHub_Meliodas_V4'
 gui.IgnoreGuiInset = true
 gui.ResetOnSpawn = false
 gui.DisplayOrder = 950
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 gui.Parent = PG
 
-local main = box(gui, 0, 0, 910, 525, BG, 2)
+local main = frame(gui, 0, 0, 910, 525, BG, 2)
 main.AnchorPoint = Vector2.new(0.5, 0.5)
 main.Position = UDim2.fromScale(0.5, 0.5)
 main.ClipsDescendants = true
 rounded(main, 18)
 outline(main, GOLD, 2)
 
--- Full-width backdrop; the gold 67 logo remains as fallback without an image asset.
 local backdrop = Instance.new('ImageLabel')
-backdrop.Name = 'BrainrotBackground'
+backdrop.Name = 'MeliodasBackground'
 backdrop.BorderSizePixel = 0
 backdrop.BackgroundTransparency = 1
-backdrop.Position = UDim2.fromOffset(535, 0)
-backdrop.Size = UDim2.fromOffset(375, 525)
+backdrop.Position = UDim2.fromOffset(530, 0)
+backdrop.Size = UDim2.fromOffset(380, 525)
 backdrop.ScaleType = Enum.ScaleType.Crop
-backdrop.ImageTransparency = 0.12
+backdrop.ImageTransparency = 0.16
 backdrop.ZIndex = 2
 backdrop.Parent = main
+
 local hasPicture = false
 if BACKGROUND_ASSET_ID ~= '' and BACKGROUND_ASSET_ID ~= '0' then
     backdrop.Image = 'rbxassetid://' .. BACKGROUND_ASSET_ID
     hasPicture = true
 else
-    local custom = (type(getcustomasset) == 'function' and getcustomasset)
-        or (type(getsynasset) == 'function' and getsynasset)
-    if type(custom) == 'function' then
-        local ok, asset = pcall(custom, BACKGROUND_FILE)
+    local assetFunction = nil
+    if type(getcustomasset) == 'function' then
+        assetFunction = getcustomasset
+    elseif type(getsynasset) == 'function' then
+        assetFunction = getsynasset
+    end
+    if assetFunction then
+        local ok, asset = pcall(assetFunction, BACKGROUND_FILE)
         if ok and type(asset) == 'string' then
             backdrop.Image = asset
             hasPicture = true
         end
     end
 end
-local fallback = text(main, '67', 660, 100, 210, 280, 140, Color3.fromRGB(95, 67, 24), Enum.Font.GothamBlack, 2)
-fallback.TextTransparency = 0.20
-fallback.TextXAlignment = Enum.TextXAlignment.Center
-fallback.Visible = not hasPicture
-local shade = box(main, 190, 0, 720, 525, BG, 3, 0.44)
 
--- Sidebar
-local sidebar = box(main, 0, 0, 192, 525, BG, 5, 0.04)
-box(main, 191, 0, 1, 525, GOLD, 7, 0.45)
-local logo = text(sidebar, 'SatisHub', 20, 23, 170, 48, 26, PALE, Enum.Font.GothamBlack)
-text(sidebar, 'MURDER DUELS  |  1V1', 22, 72, 164, 18, 10, WHITE, Enum.Font.GothamBold)
-local edition = box(sidebar, 18, 103, 158, 29, Color3.fromRGB(46, 31, 9), 6)
+local fallback = label(main, 'SH', 650, 110, 210, 260, 130, Color3.fromRGB(96, 69, 23), Enum.Font.GothamBlack, 2)
+fallback.TextXAlignment = Enum.TextXAlignment.Center
+fallback.TextTransparency = 0.18
+fallback.Visible = not hasPicture
+local shade = frame(main, 190, 0, 720, 525, BG, 3, 0.46)
+
+local sidebar = frame(main, 0, 0, 192, 525, BG, 5, 0.04)
+frame(main, 191, 0, 1, 525, GOLD, 7, 0.45)
+local logo = label(sidebar, 'SatisHub', 20, 22, 170, 48, 26, PALE, Enum.Font.GothamBlack)
+label(sidebar, 'MURDER DUELS  |  1V1', 22, 70, 164, 18, 10, WHITE, Enum.Font.GothamBold)
+local edition = frame(sidebar, 18, 103, 158, 29, Color3.fromRGB(46, 31, 9), 6)
 rounded(edition, 14)
 outline(edition, GOLD, 1)
-local editionText = text(edition, '67 BRAINROT EDITION', 6, 3, 148, 22, 11, GOLD, Enum.Font.GothamBold)
+local editionText = label(edition, 'MELIODAS EDITION', 6, 3, 148, 22, 11, GOLD, Enum.Font.GothamBold)
 editionText.TextXAlignment = Enum.TextXAlignment.Center
+label(sidebar, 'MD', 39, 444, 115, 65, 54, GOLD, Enum.Font.GothamBlack)
+label(sidebar, 'BLACK & GOLD', 20, 500, 160, 14, 10, MUTED)
+
+local pageTitle = label(main, 'COMBAT', 214, 20, 350, 39, 23, WHITE, Enum.Font.GothamBlack)
+local pageSubtitle = label(main, 'MELIODAS THEME   •   BLACK & GOLD', 215, 61, 430, 17, 11, GOLD, Enum.Font.GothamBold)
+local miniBar
+local hideButton = makeButton(main, '×', 868, 16, 28, 28, function()
+    main.Visible = false
+    miniBar.Visible = false
+end)
+hideButton.TextSize = 22
+
+local minButton = makeButton(main, '–', 834, 16, 28, 28, function()
+    main.Visible = false
+    miniBar.Visible = true
+end)
+minButton.TextSize = 23
+
+local statusStrip = frame(main, 205, 487, 688, 29, Color3.fromRGB(7, 8, 9), 9, 0.08)
+rounded(statusStrip, 8)
+outline(statusStrip, Color3.fromRGB(99, 76, 35), 1, 0.25)
+local statusText = label(statusStrip, '●  SATISHUB LOADED', 13, 1, 330, 26, 11, GREEN, Enum.Font.GothamBold, 10)
+local tinyText = label(statusStrip, 'Murder Duels   •   V4.1', 493, 1, 186, 26, 11, MUTED, Enum.Font.GothamBold, 10)
+tinyText.TextXAlignment = Enum.TextXAlignment.Right
+
+miniBar = frame(gui, 18, 18, 235, 46, BG, 20)
+miniBar.Visible = false
+rounded(miniBar, 12)
+outline(miniBar, GOLD, 2)
+label(miniBar, 'SatisHub  •  Meliodas', 14, 0, 145, 46, 14, GOLD, Enum.Font.GothamBold, 21)
+local restoreButton = makeButton(miniBar, 'Open', 162, 8, 58, 30, function()
+    miniBar.Visible = false
+    main.Visible = true
+end)
+restoreButton.TextSize = 12
+
 local navNames = {'Combat', 'Visuals', 'Movement', 'Teleport', 'Settings'}
 local navIcons = {'◎', '◉', '➤', '⇄', '⚙'}
-local buttons = {}
+local navButtons = {}
 local pages = {}
-local pageTitle = nil
-local selectedTab = 'Combat'
+local pagePositions = {
+    base = UDim2.fromOffset(206, 103),
+    enter = UDim2.fromOffset(246, 103),
+    exit = UDim2.fromOffset(166, 103),
+}
+local pageSubtitles = {
+    Combat = 'MELIODAS THEME   •   BLACK & GOLD',
+    Visuals = 'PLAYER VISUALS   •   GOLD OUTLINES',
+    Movement = 'PLAYER MOVEMENT   •   NOCLIP',
+    Teleport = 'PERSISTENCE   •   AUTO TELEPORT',
+    Settings = 'GENERAL SETTINGS   •   SATISHUB',
+}
+
+local showPage
 for i, name in ipairs(navNames) do
-    local b = button(sidebar, navIcons[i] .. '   ' .. name, 15, 155 + (i - 1) * 58, 160, 46, function()
-        selectedTab = name
-        for tabName, page in pairs(pages) do page.Visible = (tabName == name) end
-        for tabName, nav in pairs(buttons) do
-            nav.BackgroundColor3 = (tabName == name) and Color3.fromRGB(111, 72, 15) or PANEL2
-            nav.TextColor3 = (tabName == name) and GOLD or WHITE
-            nav:SetAttribute('RestColor', nav.BackgroundColor3)
-        end
-        if pageTitle then pageTitle.Text = string.upper(name) end
+    local b = makeButton(sidebar, navIcons[i] .. '   ' .. name, 15, 155 + (i - 1) * 58, 160, 46, function()
+        if showPage then showPage(name, false) end
     end)
     b.TextXAlignment = Enum.TextXAlignment.Left
     b.TextSize = 14
-    buttons[name] = b
+    navButtons[name] = b
 end
-text(sidebar, '67', 43, 445, 115, 65, 56, GOLD, Enum.Font.GothamBlack)
-text(sidebar, 'SH  /  V3.0', 19, 500, 160, 14, 10, MUTED)
-
-pageTitle = text(main, 'COMBAT', 214, 20, 350, 39, 23, WHITE, Enum.Font.GothamBlack)
-text(main, 'BLACK & GOLD   •   67 EDITION', 215, 61, 400, 17, 11, GOLD, Enum.Font.GothamBold)
-local hideButton = button(main, '×', 868, 16, 28, 28, function() main.Visible = false end)
-hideButton.TextSize = 22
-
-local statusStrip = box(main, 205, 487, 688, 29, Color3.fromRGB(7, 8, 9), 9, 0.08)
-rounded(statusStrip, 8)
-outline(statusStrip, Color3.fromRGB(99, 76, 35), 1, 0.25)
-local statusText = text(statusStrip, '●  SATISHUB LOADED', 13, 1, 330, 26, 11, GREEN, Enum.Font.GothamBold, 10)
-local tinyText = text(statusStrip, 'Murder Duels   •   V3.0', 493, 1, 186, 26, 11, MUTED, Enum.Font.GothamBold, 10)
-tinyText.TextXAlignment = Enum.TextXAlignment.Right
 
 for _, name in ipairs(navNames) do
-    local page = box(main, 206, 103, 690, 368, BG, 5, 1)
-    page.Visible = (name == 'Combat')
+    local page = frame(main, 206, 103, 690, 368, BG, 5, 1)
+    page.Visible = false
+    page.ClipsDescendants = true
     pages[name] = page
 end
 
-local function card(parent, x, y, w, h, heading)
-    local f = box(parent, x, y, w, h, Color3.fromRGB(12, 12, 14), 6, 0.09)
-    rounded(f, 13)
-    outline(f, Color3.fromRGB(221, 165, 46), 1, 0.10)
-    text(f, heading, 16, 13, w - 26, 30, 17, WHITE, Enum.Font.GothamBold, 8)
-    return f
+showPage = function(name, instant)
+    local incoming = pages[name]
+    if not incoming then return end
+    if currentPage == name and not instant then return end
+
+    pageTitle.Text = string.upper(name)
+    pageSubtitle.Text = pageSubtitles[name] or 'SATISHUB'
+
+    for tabName, btn in pairs(navButtons) do
+        local activeButton = (tabName == name)
+        btn.BackgroundColor3 = activeButton and Color3.fromRGB(111, 72, 15) or PANEL2
+        btn.TextColor3 = activeButton and GOLD or WHITE
+        btn:SetAttribute('RestColor', btn.BackgroundColor3)
+    end
+
+    if instant or currentPage == nil then
+        for tabName, page in pairs(pages) do
+            page.Visible = (tabName == name)
+            page.Position = pagePositions.base
+        end
+        currentPage = name
+        return
+    end
+
+    local outgoing = pages[currentPage]
+    currentPage = name
+
+    if outgoing and outgoing ~= incoming then
+        outgoing.Visible = true
+        local tweenOut = TweenService:Create(outgoing, TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Position = pagePositions.exit
+        })
+        tweenOut:Play()
+        task.delay(0.16, function()
+            if outgoing and currentPage ~= nil and outgoing ~= pages[currentPage] then
+                outgoing.Visible = false
+                outgoing.Position = pagePositions.base
+            end
+        end)
+    end
+
+    incoming.Visible = true
+    incoming.Position = pagePositions.enter
+    TweenService:Create(incoming, TweenInfo.new(0.20, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+        Position = pagePositions.base
+    }):Play()
+
+    for tabName, page in pairs(pages) do
+        if tabName ~= name and page ~= outgoing then
+            page.Visible = false
+            page.Position = pagePositions.base
+        end
+    end
 end
 
-local function toggle(parent, caption, key, x, y, width)
+local function card(parent, x, y, w, h, titleText)
+    local c = frame(parent, x, y, w, h, Color3.fromRGB(12, 12, 14), 6, 0.09)
+    rounded(c, 13)
+    outline(c, Color3.fromRGB(221, 165, 46), 1, 0.10)
+    label(c, titleText, 16, 13, w - 24, 30, 17, WHITE, Enum.Font.GothamBold, 8)
+    return c
+end
+
+local function restoreCollision()
+    for part, previous in pairs(original) do
+        if part and part.Parent then
+            part.CanCollide = previous
+        end
+    end
+    table.clear(original)
+end
+
+local function makeToggle(parent, caption, key, x, y, width)
     width = width or 278
-    local row = box(parent, x, y, width, 44, PANEL, 7, 0.08)
+    local row = frame(parent, x, y, width, 44, PANEL, 7, 0.08)
     rounded(row, 9)
     outline(row, Color3.fromRGB(92, 72, 44), 1, 0.40)
-    text(row, caption, 12, 4, width - 88, 36, 12, WHITE, Enum.Font.GothamBold, 8)
-    local refresh
-    local b = button(row, 'OFF', width - 77, 7, 64, 30, function()
+    label(row, caption, 12, 4, width - 88, 36, 12, WHITE, Enum.Font.GothamBold, 8)
+    local refresh = nil
+    local b = makeButton(row, 'OFF', width - 77, 7, 64, 30, function()
         cfg[key] = not cfg[key]
         saveSettings()
         if key == 'noclip' and not cfg[key] then
-            for part, previous in pairs(original) do
-                if part and part.Parent then part.CanCollide = previous end
-            end
-            table.clear(original)
+            restoreCollision()
         end
         if refresh then refresh() end
     end)
@@ -275,30 +402,37 @@ local function toggle(parent, caption, key, x, y, width)
     return row, refresh
 end
 
-local function slider(parent, caption, key, x, y, width, minimum, maximum, decimals)
-    local holder = box(parent, x, y, width, 77, PANEL, 7, 0.04)
+local function makeSlider(parent, caption, key, x, y, width, minimum, maximum, decimals)
+    local holder = frame(parent, x, y, width, 77, PANEL, 7, 0.04)
     rounded(holder, 9)
-    local name = text(holder, caption, 12, 8, width - 102, 23, 12, WHITE, Enum.Font.GothamBold, 9)
-    local value = text(holder, '', width - 110, 8, 99, 23, 13, GOLD, Enum.Font.GothamBold, 9)
+    label(holder, caption, 12, 8, width - 102, 23, 12, WHITE, Enum.Font.GothamBold, 9)
+    local value = label(holder, '', width - 110, 8, 99, 23, 13, GOLD, Enum.Font.GothamBold, 9)
     value.TextXAlignment = Enum.TextXAlignment.Right
-    local track = box(holder, 14, 46, width - 28, 6, Color3.fromRGB(63, 63, 66), 9)
+    local track = frame(holder, 14, 46, width - 28, 6, Color3.fromRGB(63, 63, 66), 9)
     rounded(track, 3)
-    local fill = box(track, 0, 0, 0, 6, GOLD, 10)
+    local fill = frame(track, 0, 0, 0, 6, GOLD, 10)
     rounded(fill, 3)
-    local knob = box(track, 0, -5, 16, 16, WHITE, 11)
+    local knob = frame(track, 0, -5, 16, 16, WHITE, 11)
     rounded(knob, 9)
     local sliding = false
     local function refresh()
         local alpha = math.clamp((cfg[key] - minimum) / (maximum - minimum), 0, 1)
         fill.Size = UDim2.new(alpha, 0, 0, 6)
         knob.Position = UDim2.new(alpha, -8, 0, -5)
-        value.Text = decimals == 0 and string.format('%d', math.floor(cfg[key] + 0.5))
-            or string.format('%.2f', cfg[key])
+        if decimals == 0 then
+            value.Text = string.format('%d', math.floor(cfg[key] + 0.5))
+        else
+            value.Text = string.format('%.2f', cfg[key])
+        end
     end
     local function setAt(mouseX)
         local alpha = math.clamp((mouseX - track.AbsolutePosition.X) / math.max(1, track.AbsoluteSize.X), 0, 1)
         local amount = minimum + (maximum - minimum) * alpha
-        cfg[key] = (decimals == 0) and math.floor(amount + 0.5) or math.floor(amount * 100 + 0.5) / 100
+        if decimals == 0 then
+            cfg[key] = math.floor(amount + 0.5)
+        else
+            cfg[key] = math.floor(amount * 100 + 0.5) / 100
+        end
         refresh()
         saveSettings()
     end
@@ -322,11 +456,11 @@ local function slider(parent, caption, key, x, y, width, minimum, maximum, decim
     return holder
 end
 
-local function choice(parent, caption, options, key, x, y, width)
-    local holder = box(parent, x, y, width, 44, PANEL, 7, 0.07)
+local function makeChoice(parent, caption, options, key, x, y, width)
+    local holder = frame(parent, x, y, width, 44, PANEL, 7, 0.07)
     rounded(holder, 9)
-    text(holder, caption, 12, 4, 122, 35, 12, WHITE, Enum.Font.GothamBold, 8)
-    local b = button(holder, '', width - 131, 6, 118, 32, function(btn)
+    label(holder, caption, 12, 4, 135, 35, 12, WHITE, Enum.Font.GothamBold, 8)
+    local b = makeButton(holder, '', width - 131, 6, 118, 32, function(btn)
         local current = cfg[key]
         local index = table.find(options, current) or 0
         cfg[key] = options[(index % #options) + 1]
@@ -335,57 +469,68 @@ local function choice(parent, caption, options, key, x, y, width)
     end)
     b.Text = cfg[key] == 'HumanoidRootPart' and 'Torso' or cfg[key]
     b.TextColor3 = GOLD
+    b:SetAttribute('RestColor', b.BackgroundColor3)
     return holder
 end
 
--- COMBAT
+-- COMBAT PAGE
 local combat = pages.Combat
 local combatLeft = card(combat, 0, 0, 340, 326, '◎  Aimbot')
-text(combatLeft, 'Automatically track a visible opponent.', 16, 45, 308, 23, 11, MUTED)
-toggle(combatLeft, 'Automatic Aim', 'aim', 15, 75, 310)
-choice(combatLeft, 'Aim Part', {'Head', 'HumanoidRootPart'}, 'aimPart', 15, 127, 310)
-toggle(combatLeft, 'Wall Check', 'wall', 15, 181, 310)
-toggle(combatLeft, 'Team Check', 'team', 15, 234, 310)
+label(combatLeft, 'Automatically track a visible opponent.', 16, 45, 308, 23, 11, MUTED)
+makeToggle(combatLeft, 'Automatic Aim', 'aim', 15, 75, 310)
+makeChoice(combatLeft, 'Aim Part', {'Head', 'HumanoidRootPart'}, 'aimPart', 15, 127, 310)
+makeToggle(combatLeft, 'Wall Check', 'wall', 15, 181, 310)
+makeToggle(combatLeft, 'Long Range Aim', 'longRange', 15, 234, 310)
 local combatRight = card(combat, 353, 0, 335, 326, '◉  FOV Settings')
-slider(combatRight, 'FOV radius (px)', 'fov', 14, 51, 307, 30, 550, 0)
-slider(combatRight, 'Aim smoothness', 'smooth', 14, 139, 307, 0.05, 1, 2)
-toggle(combatRight, 'Show FOV circle', 'circle', 14, 238, 307)
-local targetText = text(combat, 'TARGET: none', 7, 338, 670, 26, 12, GOLD, Enum.Font.GothamBold, 8)
+makeSlider(combatRight, 'FOV radius (px)', 'fov', 14, 51, 307, 30, 550, 0)
+makeSlider(combatRight, 'Aim smoothness', 'smooth', 14, 139, 307, 0.05, 1, 2)
+makeToggle(combatRight, 'Show FOV circle', 'circle', 14, 238, 307)
+local targetText = label(combat, 'TARGET: none', 7, 338, 670, 26, 12, GOLD, Enum.Font.GothamBold, 8)
 
--- VISUALS
+-- VISUALS PAGE
 local visuals = pages.Visuals
 local visCard = card(visuals, 0, 0, 688, 260, '◉  Player Visuals')
-text(visCard, 'Gold player outlines; local rendering only.', 18, 49, 626, 24, 12, MUTED)
-toggle(visCard, 'Player ESP', 'esp', 18, 85, 645)
-toggle(visCard, 'FOV Circle', 'circle', 18, 145, 645)
-text(visuals, 'Highlights may be hidden or unsupported by some game rigs.', 8, 285, 660, 36, 12, MUTED)
+label(visCard, 'Gold player outlines; local rendering only.', 18, 49, 626, 24, 12, MUTED)
+makeToggle(visCard, 'Player ESP', 'esp', 18, 85, 645)
+makeToggle(visCard, 'FOV Circle', 'circle', 18, 145, 645)
+makeToggle(visCard, 'Team Check', 'team', 18, 204, 645)
+local visNote = label(visuals, 'Highlights may be hidden or unsupported by some game rigs.', 8, 285, 660, 36, 12, MUTED)
+visNote.TextWrapped = true
 
--- MOVEMENT
+-- MOVEMENT PAGE
 local movement = pages.Movement
 local moveCard = card(movement, 0, 0, 688, 250, '➤  Movement')
-text(moveCard, 'Noclip changes your local character collisions.', 18, 48, 630, 28, 12, MUTED)
-toggle(moveCard, 'Noclip', 'noclip', 18, 90, 645)
-text(moveCard, 'The server may restore your position or collision.', 18, 156, 640, 48, 12, MUTED)
+label(moveCard, 'Noclip changes your local character collisions.', 18, 48, 630, 28, 12, MUTED)
+makeToggle(moveCard, 'Noclip', 'noclip', 18, 90, 645)
+local moveNote = label(moveCard, 'The server may restore your position or collision.', 18, 156, 640, 48, 12, MUTED)
+moveNote.TextWrapped = true
 
--- TELEPORT
+-- TELEPORT PAGE
 local teleportPage = pages.Teleport
 local tpCard = card(teleportPage, 0, 0, 688, 295, '⇄  Teleport / Persistent Settings')
-text(tpCard, 'Re-run SatisHub after moving to another place or server.', 18, 49, 650, 29, 12, MUTED)
-local mandatoryLabel = text(tpCard, 'AUTO EXECUTE ON TELEPORT   •   ALWAYS ON', 18, 91, 645, 40, 15, GREEN, Enum.Font.GothamBold)
+label(tpCard, 'Re-run SatisHub after a compatible place teleport.', 18, 49, 650, 29, 12, MUTED)
+local mandatoryLabel = label(tpCard, 'AUTO EXECUTE ON TELEPORT   •   ALWAYS ON', 18, 91, 645, 40, 15, GREEN, Enum.Font.GothamBold)
 mandatoryLabel.TextWrapped = true
-local queueAvailable = (type(queue_on_teleport) == 'function')
-    or (type(syn) == 'table' and type(syn.queue_on_teleport) == 'function')
-local supportMsg = queueAvailable and 'Teleport queue API: available' or 'Teleport queue API: not detected'
-text(tpCard, supportMsg, 19, 158, 628, 28, 12, queueAvailable and GREEN or RED, Enum.Font.GothamBold)
-text(tpCard, 'Settings also save to local JSON when writefile/readfile are available.', 19, 197, 640, 60, 12, MUTED).TextWrapped = true
+local function getQueue()
+    if type(queue_on_teleport) == 'function' then return queue_on_teleport end
+    if type(syn) == 'table' and type(syn.queue_on_teleport) == 'function' then return syn.queue_on_teleport end
+    return nil
+end
+local queueAvailable = getQueue() ~= nil
+local supportMsg = queueAvailable and 'Teleport queue API detected' or 'Teleport queue API not detected'
+label(tpCard, supportMsg, 19, 158, 628, 28, 12, queueAvailable and GREEN or RED, Enum.Font.GothamBold)
+local tpNote = label(tpCard, 'Your options stay saved, and the script queues itself again on teleport whenever the executor supports it.', 19, 197, 640, 60, 12, MUTED)
+tpNote.TextWrapped = true
 
--- SETTINGS
+-- SETTINGS PAGE
 local settings = pages.Settings
-local settingsCard = card(settings, 0, 0, 688, 302, '⚙  SatisHub Settings')
-choice(settingsCard, 'Aim method', {'Camera', 'Mouse'}, 'aimMethod', 18, 63, 645)
-text(settingsCard, 'Camera mode rotates the view. Mouse mode requires mousemoverel.', 18, 120, 648, 44, 12, MUTED).TextWrapped = true
-text(settingsCard, 'Right Shift = show/hide the menu', 18, 183, 635, 27, 12, GOLD)
-text(settingsCard, 'Auto Aim does not require holding the right mouse button.', 18, 224, 645, 27, 12, WHITE)
+local settingsCard = card(settings, 0, 0, 688, 320, '⚙  SatisHub Settings')
+makeChoice(settingsCard, 'Aim method', {'Camera', 'Mouse'}, 'aimMethod', 18, 63, 645)
+local info1 = label(settingsCard, 'Camera mode rotates the view. Mouse mode requires mousemoverel.', 18, 120, 648, 44, 12, MUTED)
+info1.TextWrapped = true
+label(settingsCard, 'Right Shift = show / hide the menu', 18, 183, 635, 27, 12, GOLD)
+label(settingsCard, 'Automatic Aim does not need the right mouse button.', 18, 224, 645, 27, 12, WHITE)
+label(settingsCard, 'The minimize button keeps a small restore bar on screen.', 18, 258, 645, 27, 12, WHITE)
 
 -- FOV overlay
 local fov = Instance.new('Frame')
@@ -397,17 +542,19 @@ fov.Parent = gui
 rounded(fov, 999)
 outline(fov, GOLD, 1.5, 0.15)
 
--- ESP
 local function clearESP()
     for p, obj in pairs(highlights) do
         pcall(function() obj:Destroy() end)
         highlights[p] = nil
     end
 end
+
 local function refreshESP()
-    if not cfg.esp then clearESP(); return end
-    local playersNow = Players:GetPlayers()
-    for _, p in ipairs(playersNow) do
+    if not cfg.esp then
+        clearESP()
+        return
+    end
+    for _, p in ipairs(Players:GetPlayers()) do
         if p ~= LP then
             local ch = p.Character
             if highlights[p] and (not ch or highlights[p].Adornee ~= ch) then
@@ -416,7 +563,7 @@ local function refreshESP()
             end
             if ch and not highlights[p] then
                 local h = Instance.new('Highlight')
-                h.Name = 'SatisHub_67_ESP'
+                h.Name = 'SatisHub_Meliodas_ESP'
                 h.Adornee = ch
                 h.FillColor = GOLD
                 h.FillTransparency = 0.72
@@ -429,23 +576,21 @@ local function refreshESP()
         end
     end
     for p, obj in pairs(highlights) do
-        if not p.Parent then obj:Destroy(); highlights[p] = nil end
+        if not p.Parent then
+            obj:Destroy()
+            highlights[p] = nil
+        end
     end
 end
 
-local function restoreCollision()
-    for part, previous in pairs(original) do
-        if part and part.Parent then part.CanCollide = previous end
-    end
-    table.clear(original)
-end
-
--- Aim selection is calculated from the centre of the camera viewport,
--- not the physical cursor (critical in first-person / locked-mouse games).
 local function chooseTarget(cam)
     local viewport = cam.ViewportSize
     local centre = Vector2.new(viewport.X / 2, viewport.Y / 2)
-    local best, bestDist, bestScreen = nil, cfg.fov, nil
+    local bestPart = nil
+    -- Long range removes the screen-space FOV limit, not engine streaming/visibility limits.
+    local bestDist = cfg.longRange and math.huge or cfg.fov
+    local bestScreen = nil
+
     for _, p in ipairs(Players:GetPlayers()) do
         if p ~= LP then
             local ch = p.Character
@@ -467,38 +612,48 @@ local function chooseTarget(cam)
                             clear = (hit == nil) or hit.Instance:IsDescendantOf(ch)
                         end
                         if clear then
-                            best, bestDist, bestScreen = part, distance, screenPoint
+                            bestPart = part
+                            bestDist = distance
+                            bestScreen = screenPoint
                         end
                     end
                 end
             end
         end
     end
-    return best, bestDist, bestScreen, centre
+    return bestPart, bestDist, bestScreen, centre
 end
 
-local renderKey = 'SatisHub67V3Render'
+local renderKey = 'SatisHubMeliodasRender'
 local okBind, errBind = pcall(function()
     RunService:BindToRenderStep(renderKey, Enum.RenderPriority.Camera.Value + 5, function()
         if not alive then return end
         local cam = workspace.CurrentCamera
         if not cam then return end
+
         local vs = cam.ViewportSize
         local centre = Vector2.new(vs.X / 2, vs.Y / 2)
         fov.Size = UDim2.fromOffset(cfg.fov * 2, cfg.fov * 2)
         fov.Position = UDim2.fromOffset(centre.X, centre.Y)
         fov.Visible = cfg.aim and cfg.circle
+
         if not cfg.aim then
-            if lastTarget ~= nil then lastTarget = nil; targetText.Text = 'TARGET: none' end
+            if lastTarget ~= nil then
+                lastTarget = nil
+                targetText.Text = 'TARGET: none'
+            end
             return
         end
+
         local part, distance, screenPosition = chooseTarget(cam)
         if part then
             local model = part:FindFirstAncestorOfClass('Model')
             local name = model and model.Name or 'unknown'
-            if lastTarget ~= part then targetText.Text = 'TARGET: ' .. name end
-            lastTarget, lastDistance = part, distance
-            if cfg.aimMethod == 'Mouse' and type(mousemoverel) == 'function' then
+            targetText.Text = 'TARGET: ' .. name
+            lastTarget = part
+            lastDistance = distance
+
+            if cfg.aimMethod == 'Mouse' and type(mousemoverel) == 'function' and screenPosition then
                 local offset = screenPosition - centre
                 pcall(mousemoverel, offset.X * cfg.smooth, offset.Y * cfg.smooth)
             else
@@ -506,12 +661,15 @@ local okBind, errBind = pcall(function()
                 cam.CFrame = cam.CFrame:Lerp(desired, cfg.smooth)
             end
         else
-            if lastTarget ~= nil then targetText.Text = 'TARGET: none in FOV' end
-            lastTarget, lastDistance = nil, nil
+            lastTarget = nil
+            lastDistance = nil
+            targetText.Text = 'TARGET: none in FOV'
         end
     end)
 end)
-if not okBind then warn('[SatisHub 67] Aim render error:', errBind) end
+if not okBind then
+    warn('[SatisHub] Aim render error:', errBind)
+end
 
 bind(RunService.Stepped, function()
     if not cfg.noclip then return end
@@ -529,56 +687,62 @@ bind(LP.CharacterRemoving, restoreCollision)
 local espTime = 0
 bind(RunService.Heartbeat, function(dt)
     espTime = espTime + dt
-    if espTime > 0.35 then espTime = 0; refreshESP() end
+    if espTime > 0.35 then
+        espTime = 0
+        refreshESP()
+    end
 end)
 
--- Teleport state: snapshot active toggles (and FOV/smoothness) into the queued script.
--- Requires an executor that supports queue_on_teleport and recreates the Lua environment.
-local function getQueue()
-    if type(queue_on_teleport) == 'function' then return queue_on_teleport end
-    if type(syn) == 'table' and type(syn.queue_on_teleport) == 'function' then return syn.queue_on_teleport end
-    return nil
-end
 local function scheduleAfterTeleport()
     cfg.autoTeleport = true
     saveSettings()
     local q = getQueue()
     if type(q) ~= 'function' then
-        warn('[SatisHub 67] No queue_on_teleport API; manual re-execution required.')
+        warn('[SatisHub] No queue_on_teleport API; manual re-execution required.')
         return
     end
     local serialized = HttpService:JSONEncode(cfg)
     local bootstrap = string.format([[
 local env = (type(getgenv) == 'function' and getgenv()) or _G
-env.SatisHub67Seed = game:GetService('HttpService'):JSONDecode(%q)
+env.SatisHubMeliodasSeed = game:GetService('HttpService'):JSONDecode(%q)
 local ok, body = pcall(function() return game:HttpGet(%q) end)
-if not ok then warn('[SatisHub 67] Teleport download failed:', body) return end
+if not ok then warn('[SatisHub] Teleport download failed:', body) return end
 local fn, errorText = loadstring(body)
-if not fn then warn('[SatisHub 67] Teleport syntax:', errorText) return end
+if not fn then warn('[SatisHub] Teleport syntax:', errorText) return end
 fn()
 ]], serialized, RAW_URL)
     local ok, errorText = pcall(q, bootstrap)
     if ok then
-        warn('[SatisHub 67] Queued after teleport with your settings.')
+        teleportQueued = true
+        warn('[SatisHub] Teleport queue registered with current settings.')
     else
-        warn('[SatisHub 67] Teleport queue failed:', errorText)
+        warn('[SatisHub] Teleport queue failed:', errorText)
     end
 end
+
+-- Queue right away so the code is prepared before the teleport begins.
+-- Refresh at the start of a real place teleport to capture the latest toggles.
+scheduleAfterTeleport()
 bind(LP.OnTeleport, function(state)
-    if state == Enum.TeleportState.Started then scheduleAfterTeleport() end
+    if state == Enum.TeleportState.Started then
+        print('[SatisHub] OnTeleport Started; refreshing saved settings.')
+        scheduleAfterTeleport()
+    elseif state == Enum.TeleportState.Failed then
+        warn('[SatisHub] Roblox reported that the teleport failed.')
+    end
 end)
 
--- Inputs / clean dragging (header only)
 local dragStart, startPosition
 bind(main.InputBegan, function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1
         and input.Position.Y <= main.AbsolutePosition.Y + 92
-        and input.Position.X <= main.AbsolutePosition.X + 830 then
+        and input.Position.X <= main.AbsolutePosition.X + 820 then
         dragging = true
         dragStart = input.Position
         startPosition = main.Position
     end
 end)
+
 bind(UIS.InputChanged, function(input)
     if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
         local delta = input.Position - dragStart
@@ -586,28 +750,38 @@ bind(UIS.InputChanged, function(input)
             startPosition.Y.Scale, startPosition.Y.Offset + delta.Y)
     end
 end)
+
 bind(UIS.InputEnded, function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
-end)
-bind(UIS.InputBegan, function(input, processed)
-    if not processed and input.KeyCode == Enum.KeyCode.RightShift and not UIS:GetFocusedTextBox() then
-        main.Visible = not main.Visible
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = false
     end
 end)
 
--- Show combat by default, keep user settings from previous teleport.
-buttons.Combat.BackgroundColor3 = Color3.fromRGB(111, 72, 15)
-buttons.Combat.TextColor3 = GOLD
-buttons.Combat:SetAttribute('RestColor', buttons.Combat.BackgroundColor3)
+bind(UIS.InputBegan, function(input, processed)
+    if processed or UIS:GetFocusedTextBox() then return end
+    if input.KeyCode == Enum.KeyCode.RightShift then
+        if miniBar.Visible then
+            miniBar.Visible = false
+            main.Visible = true
+        else
+            main.Visible = not main.Visible
+        end
+    end
+end)
+
+showPage('Combat', true)
 saveSettings()
-env.SatisHub67Cleanup = function()
+
+env.SatisHubMeliodasCleanup = function()
     alive = false
     cfg.noclip = false
     clearESP()
     restoreCollision()
     pcall(function() RunService:UnbindFromRenderStep(renderKey) end)
-    for _, connection in ipairs(connections) do connection:Disconnect() end
+    for _, connection in ipairs(connections) do
+        connection:Disconnect()
+    end
     gui:Destroy()
 end
-print('[SatisHub 67] V3.1 loaded; automatic aim on toggle; saved settings:',
-    type(writefile) == 'function' and 'file API available' or 'teleport seed only')
+
+print('[SatisHub] Meliodas V4.1 loaded; queue registered:', teleportQueued, 'long-range aim:', cfg.longRange)
