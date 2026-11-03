@@ -210,6 +210,59 @@ end
 
 
 
+
+-- Built-in Discord icon, used by the launch invitation.
+local DISCORD_INVITE_URL = 'https://discord.gg/WvCUTSDSNT'
+local DISCORD_ICON_FILE = 'SatisHub_Discord_Icon.png'
+local EMBEDDED_DISCORD_ICON_FILE = 'SatisHub_Discord_Embedded.png'
+local DISCORD_ICON_B64 = table.concat({
+    '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',
+})
+
 local GOLD = Color3.fromRGB(255, 198, 56)
 local GOLD_DARK = Color3.fromRGB(120, 78, 13)
 local PALE = Color3.fromRGB(255, 232, 180)
@@ -234,6 +287,7 @@ local defaults = {
     tpEnemy = false,
     espBox = false,
     espLine = false,
+    rainbowESP = false,
     noclip = false,
     autoTeleport = true,
     aimMethod = 'Mouse', -- fixed internally; no UI control
@@ -262,7 +316,7 @@ cfg.autoTeleport = true
 cfg.fov = math.clamp(cfg.fov, 30, 850)
 cfg.smooth = math.clamp(cfg.smooth, 0.03, 1)
 if cfg.aimPart ~= 'Head' and cfg.aimPart ~= 'HumanoidRootPart' then cfg.aimPart = 'Head' end
--- A saved configuration or teleport payload cannot change this mode.
+-- Mouse aim method is fixed.
 cfg.aimMethod = 'Mouse'
 if cfg.backgroundAssetId == '0' and BACKGROUND_ASSET_ID ~= '0' then
     cfg.backgroundAssetId = BACKGROUND_ASSET_ID
@@ -403,14 +457,14 @@ local function makeButton(parent, value, x, y, w, h, fn)
 end
 
 local gui = Instance.new('ScreenGui')
-gui.Name = 'SatisHub_MD_V5_3_Anime'
+gui.Name = 'SatisHub_MD_V5_4_Rainbow'
 gui.IgnoreGuiInset = true
 gui.ResetOnSpawn = false
 gui.DisplayOrder = 950
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 gui.Parent = PG
 
--- O fundo do menu e OPACO; a foto ocupa toda a area interior.
+-- The opaque menu uses a full-size background image.
 main = frame(gui, 0, 0, 1060, 650, BG, 3, 0)
 main.AnchorPoint = Vector2.new(0.5, 0.5)
 main.Position = UDim2.fromScale(0.5, 0.5)
@@ -428,7 +482,7 @@ updateWindowScale()
 local shine = TweenService:Create(mainBorder, TweenInfo.new(2.1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {Transparency=0.42})
 shine:Play()
 
--- Imagem em todo o painel, por trás dos cartões.
+-- Full-panel background image behind the controls.
 local animePhoto = Instance.new('ImageLabel')
 animePhoto.Name = 'MeliodasArtwork'
 animePhoto.BackgroundTransparency = 1
@@ -450,43 +504,43 @@ tintGradient.Transparency = NumberSequence.new({
 tintGradient.Rotation = 0
 tintGradient.Parent = animeTint
 
--- Meliodas aparece apenas como imagem de fundo; sem painel lateral independente.
--- Correcao de fundo: nao o esconder silenciosamente quando nao ha imagem.
-local photoWarning = label(main, 'MELIODAS: IMAGEM INDISPONIVEL (VER CONSOLE)', 633, 100, 405, 30, 12, GOLD, Enum.Font.GothamBold, 7)
+-- Meliodas appears as a full-panel background, not as a separate portrait.
+-- Warn if the background cannot load.
+local photoWarning = label(main, 'MELIODAS ART UNAVAILABLE (CHECK CONSOLE)', 633, 100, 405, 30, 12, GOLD, Enum.Font.GothamBold, 7)
 photoWarning.TextXAlignment = Enum.TextXAlignment.Right
-local pictureStatus = 'Imagem nao configurada'
+local pictureStatus = 'Image not configured'
 local function applyImage()
     local assetId = tostring(cfg.backgroundAssetId or '0')
     assetId = assetId:match('^%s*(%d+)%s*$') or '0'
     if assetId ~= '0' then
         animePhoto.Image = 'rbxassetid://' .. assetId
         photoWarning.Visible = false
-        pictureStatus = 'Asset ID selecionado: ' .. assetId
+        pictureStatus = 'Selected asset ID: ' .. assetId
         return true
     end
     local embedded = getLocalImage(BACKGROUND_FILE, GENERATED_BG_FILE, EMBEDDED_BG_B64)
     if embedded then
         animePhoto.Image = embedded
-        pictureStatus = 'Meliodas: imagem incluída no SatisHub'
+        pictureStatus = 'Meliodas: image included with SatisHub'
         photoWarning.Visible = false
         return true
     end
     animePhoto.Image = ''
     photoWarning.Visible = false
-    pictureStatus = 'Imagem indisponivel: getcustomasset/writefile ou ID Roblox necessario'
+    pictureStatus = 'Image unavailable: local asset support or Roblox image ID required'
     warn('[SatisHub] Meliodas image cannot load; check getcustomasset/writefile or set a Roblox image ID in Settings.')
     return false
 end
 applyImage()
 
--- Header dourado com divisoria. Barra lateral com icones vetoriais novos.
+-- Gold header and custom image icons in sidebar.
 local sidebar = frame(main, 0, 0, 218, 650, BG, 8, 0.12)
 stroke(sidebar, Color3.fromRGB(90, 65, 18), 1, 0.6)
 local sideDivider = frame(main, 217, 0, 2, 650, GOLD, 9, 0.40)
 label(sidebar, 'SatisHub', 23, 23, 175, 43, 28, PALE, Enum.Font.GothamBlack, 11)
 label(sidebar, 'MURDER DUELS  •  1V1', 25, 69, 171, 25, 11, MUTED, Enum.Font.GothamBold, 11)
 
--- Emblema com profundidade, M azul e D vermelho.
+-- 3D emblem with blue M and red D.
 local mdOrbit = frame(sidebar, 24, 110, 170, 96, BG, 9, 1)
 rounded(mdOrbit, 28)
 local orbitStroke = stroke(mdOrbit, GOLD, 2, 0.18)
@@ -582,7 +636,7 @@ local statusStrip = frame(main, 237, 597, 802, 35, BG, 12, 0.27)
 rounded(statusStrip, 9)
 stroke(statusStrip, GOLD_DARK, 1, 0.20)
 statusText = label(statusStrip, '●  SATISHUB READY', 16, 2, 540, 31, 12, GREEN, Enum.Font.GothamBold, 13)
-local versionText = label(statusStrip, 'Murder Duels   •   V5.3', 573, 2, 208, 31, 12, MUTED, Enum.Font.GothamBold, 13)
+local versionText = label(statusStrip, 'Murder Duels   •   V5.4', 573, 2, 208, 31, 12, MUTED, Enum.Font.GothamBold, 13)
 versionText.TextXAlignment = Enum.TextXAlignment.Right
 
 local pageNames = {'Combat', 'Visuals', 'Movement', 'Settings'}
@@ -591,11 +645,11 @@ local headerLabels = {
     Combat = 'AIMBOT  •  PRECISION SETTINGS',
     Visuals = 'PLAYER VISUALS  •  GOLD OUTLINES',
     Movement = 'MOVEMENT  •  COLLISION SETTINGS',
-    Settings = 'PERSONALIZACAO  •  ASSETS E CONTROLOS',
+    Settings = 'CUSTOMIZATION  •  ASSETS & CONTROLS',
 }
 local showPage
 
--- Icones reais PNG para todas as abas, carregados do codigo quando suportado.
+-- Embedded PNG icons for all tabs when supported.
 local iconSources = {
     Combat = getLocalImage('SatisHub_Tab_Combat.png', 'SatisHub_Icon_Combat_Embedded.png', ICON_COMBAT_B64),
     Visuals = getLocalImage('SatisHub_Tab_Visuals.png', 'SatisHub_Icon_Visuals_Embedded.png', ICON_VISUALS_B64),
@@ -631,10 +685,10 @@ for i, name in ipairs(pageNames) do
     label(nav, name, 63, 0, 111, 58, 16, WHITE, Enum.Font.GothamBold, 12)
     navButtons[name] = nav
 end
-label(sidebar, 'SHIFT DIREITO  •  MENU', 18, 579, 187, 21, 10, MUTED, Enum.Font.GothamBold, 11)
+label(sidebar, 'RIGHT SHIFT  •  MENU', 18, 579, 187, 21, 10, MUTED, Enum.Font.GothamBold, 11)
 label(sidebar, 'MD / BLUE & RED', 20, 608, 186, 18, 11, GOLD, Enum.Font.GothamBold, 11)
 
--- CanvasGroup anima tambem os textos e botoes, nao apenas o fundo.
+-- CanvasGroup also animates text and buttons.
 for _, name in ipairs(pageNames) do
     local canvas = Instance.new('CanvasGroup')
     canvas.Name = name .. 'Page'
@@ -702,7 +756,7 @@ showPage = function(name, instant)
     end)
 end
 
--- Cartoes maiores com texto em varias linhas e sem ultrapassar margens.
+-- Larger cards with wrapped text.
 local function card(parent, x, y, w, h, heading, subtitle)
     local c = frame(parent, x, y, w, h, Color3.fromRGB(10, 11, 16), 7, 0.64)
     rounded(c, 15)
@@ -810,14 +864,14 @@ local function sliderRow(parent, caption, key, x, y, w, mn, mx, decimal)
     return c
 end
 
--- 2 cards com espacamento e texto protegido.
+-- Two readable combat cards.
 local combat = pages.Combat
-local combatLeft = card(combat, 0, 0, 390, 401, 'AIMBOT', 'Opcoes de alvo e verificacao de visibilidade.')
+local combatLeft = card(combat, 0, 0, 390, 401, 'AIMBOT', 'Targeting options and visibility checks.')
 optionRow(combatLeft, 'Automatic Aim', 'aim', 15, 103, 360)
 choiceRow(combatLeft, 'Aim Part', 'aimPart', {'Head', 'HumanoidRootPart'}, 15, 166, 360)
 optionRow(combatLeft, 'Wall Check', 'wall', 15, 229, 360)
 optionRow(combatLeft, 'Long Range Aim', 'longRange', 15, 292, 360)
-local combatRight = card(combat, 412, 0, 390, 401, 'FOV & PRECISION', 'Personaliza a area de procura e suavidade da mira.')
+local combatRight = card(combat, 412, 0, 390, 401, 'FOV & PRECISION', 'Adjust aim radius and tracking smoothness.')
 sliderRow(combatRight, 'FOV Radius (px)', 'fov', 15, 100, 360, 30, 850, 0)
 sliderRow(combatRight, 'Aim Smoothness', 'smooth', 15, 215, 360, 0.03, 1, 2)
 optionRow(combatRight, 'Show FOV Circle', 'circle', 15, 329, 360)
@@ -830,29 +884,30 @@ visualScroll.BackgroundTransparency = 1
 visualScroll.BorderSizePixel = 0
 visualScroll.ScrollBarThickness = 4
 visualScroll.ScrollBarImageColor3 = GOLD
-visualScroll.CanvasSize = UDim2.fromOffset(0, 530)
+visualScroll.CanvasSize = UDim2.fromOffset(0, 600)
 visualScroll.ZIndex = 7
 visualScroll.Parent = visuals
-local visCard = card(visualScroll, 0, 0, 790, 518, 'VISUAL SETTINGS', 'ESP, marcadores e atalhos independentes.')
+local visCard = card(visualScroll, 0, 0, 790, 588, 'VISUAL SETTINGS', 'ESP and independent overlay options.')
 optionRow(visCard, 'Player ESP', 'esp', 18, 100, 748)
-optionRow(visCard, 'ESP Box', 'espBox', 18, 163, 748)
-optionRow(visCard, 'ESP Line', 'espLine', 18, 226, 748)
-optionRow(visCard, 'FOV Circle', 'circle', 18, 289, 748)
-optionRow(visCard, 'Team Check', 'team', 18, 352, 748)
-optionRow(visCard, 'TP to Enemy  [U]', 'tpEnemy', 18, 415, 748)
+optionRow(visCard, 'Rainbow ESP', 'rainbowESP', 18, 163, 748)
+optionRow(visCard, 'ESP Box', 'espBox', 18, 226, 748)
+optionRow(visCard, 'ESP Line', 'espLine', 18, 289, 748)
+optionRow(visCard, 'FOV Circle', 'circle', 18, 352, 748)
+optionRow(visCard, 'Team Check', 'team', 18, 415, 748)
+optionRow(visCard, 'TP to Enemy  [U]', 'tpEnemy', 18, 478, 748)
 
 local movement = pages.Movement
-local moveCard = card(movement, 0, 0, 802, 401, 'MOVEMENT', 'Configuracoes de colisao locais do personagem.')
+local moveCard = card(movement, 0, 0, 802, 401, 'MOVEMENT', 'Local character collision controls.')
 optionRow(moveCard, 'Noclip', 'noclip', 18, 111, 764)
-local moveNote = label(moveCard, 'O servidor pode corrigir o movimento ou restaurar colisoes.', 19, 206, 760, 63, 14, MUTED)
+local moveNote = label(moveCard, 'The server may override movement or restore collisions.', 19, 206, 760, 63, 14, MUTED)
 moveNote.TextWrapped = true
 
 local settings = pages.Settings
-local settingsCard = card(settings, 0, 0, 802, 355, 'SETTINGS', 'Interface, atalhos e persistencia de opcoes.')
+local settingsCard = card(settings, 0, 0, 802, 355, 'SETTINGS', 'Interface, shortcuts and saved options.')
 label(settingsCard, 'RIGHT SHIFT', 22, 118, 250, 32, 18, PALE, Enum.Font.GothamBold, 10)
-label(settingsCard, 'Abrir ou esconder o menu do SatisHub', 22, 154, 710, 29, 14, WHITE, Enum.Font.Gotham, 10)
+label(settingsCard, 'Show or hide the SatisHub menu', 22, 154, 710, 29, 14, WHITE, Enum.Font.Gotham, 10)
 label(settingsCard, 'AUTO EXECUTE', 22, 220, 300, 32, 18, GOLD, Enum.Font.GothamBold, 10)
-label(settingsCard, 'Sempre ativo quando o executor permite reexecucao apos teleport.', 22, 255, 718, 49, 14, MUTED, Enum.Font.Gotham, 10).TextWrapped = true
+label(settingsCard, 'Always enabled when the executor supports re-execution after teleport.', 22, 255, 718, 49, 14, MUTED, Enum.Font.Gotham, 10).TextWrapped = true
 
 -- FOV overlay
 local fov = frame(gui, 0, 0, 1, 1, GOLD, 3, 1)
@@ -882,6 +937,7 @@ local function validEnemy(p)
     return root ~= nil and hum ~= nil and hum.Health > 0
 end
 
+local espAnimatedColor = GOLD
 local function refreshESP()
     if not cfg.esp then clearESP(); return end
     for _, p in ipairs(Players:GetPlayers()) do
@@ -898,9 +954,9 @@ local function refreshESP()
                 local h = Instance.new('Highlight')
                 h.Name = 'SatisHub_Anime_ESP'
                 h.Adornee = ch
-                h.FillColor = GOLD
+                h.FillColor = espAnimatedColor
                 h.FillTransparency = 0.74
-                h.OutlineColor = WHITE
+                h.OutlineColor = espAnimatedColor
                 h.OutlineTransparency = 0
                 h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
                 h.Parent = gui
@@ -965,14 +1021,14 @@ local function makeMarker()
     boxFrame.Visible = false
     boxFrame.Parent = visualOverlay
     local border = Instance.new('UIStroke')
-    border.Color = GOLD
+    border.Color = espAnimatedColor
     border.Thickness = 2
     border.Parent = boxFrame
 
     local lineFrame = Instance.new('Frame')
     lineFrame.Name = 'ESP_Line'
     lineFrame.AnchorPoint = Vector2.new(0, 0.5)
-    lineFrame.BackgroundColor3 = GOLD
+    lineFrame.BackgroundColor3 = espAnimatedColor
     lineFrame.BorderSizePixel = 0
     lineFrame.Visible = false
     lineFrame.Parent = visualOverlay
@@ -1162,6 +1218,26 @@ bind(LP.CharacterRemoving, restoreCollision)
 local espTime = 0
 bind(RunService.Heartbeat, function(dt)
     espTime = espTime + dt
+    if cfg.rainbowESP and cfg.esp then
+        espAnimatedColor = Color3.fromHSV((os.clock() * 0.22) % 1, 0.92, 1)
+    else
+        espAnimatedColor = GOLD
+    end
+    for _, highlight in pairs(highlights) do
+        if highlight and highlight.Parent then
+            highlight.FillColor = espAnimatedColor
+            highlight.OutlineColor = cfg.rainbowESP and espAnimatedColor or WHITE
+        end
+    end
+    for _, marker in pairs(extraESP) do
+        if marker.box and marker.box.Parent then
+            local border = marker.box:FindFirstChildOfClass('UIStroke')
+            if border then border.Color = espAnimatedColor end
+        end
+        if marker.line and marker.line.Parent then
+            marker.line.BackgroundColor3 = espAnimatedColor
+        end
+    end
     if espTime > 0.35 then espTime = 0; refreshESP() end
 end)
 
@@ -1277,6 +1353,84 @@ bind(UIS.InputBegan, function(input, processed)
     end
 end)
 
+
+-- Launch Discord invitation: always shown independently of the minimized main menu.
+local DiscordGui = Instance.new('Frame')
+DiscordGui.Name = 'DiscordWelcome'
+DiscordGui.AnchorPoint = Vector2.new(0.5, 0)
+DiscordGui.Position = UDim2.new(0.5, 0, 0, -170)
+DiscordGui.Size = UDim2.fromOffset(440, 148)
+DiscordGui.BackgroundColor3 = Color3.fromRGB(17, 18, 29)
+DiscordGui.BackgroundTransparency = 0.03
+DiscordGui.BorderSizePixel = 0
+DiscordGui.ZIndex = 80
+DiscordGui.Parent = gui
+rounded(DiscordGui, 16)
+stroke(DiscordGui, Color3.fromRGB(88, 101, 242), 2, 0.02)
+
+local discordIcon = Instance.new('ImageLabel')
+discordIcon.Name = 'DiscordIcon'
+discordIcon.BackgroundTransparency = 1
+discordIcon.Position = UDim2.fromOffset(20, 18)
+discordIcon.Size = UDim2.fromOffset(68, 68)
+discordIcon.ScaleType = Enum.ScaleType.Fit
+discordIcon.ZIndex = 81
+discordIcon.Parent = DiscordGui
+local discordAsset = getLocalImage(DISCORD_ICON_FILE, EMBEDDED_DISCORD_ICON_FILE, DISCORD_ICON_B64)
+discordIcon.Image = discordAsset or ''
+if not discordAsset then
+    local discordFallback = label(DiscordGui, 'DISCORD', 15, 18, 85, 68, 13, Color3.fromRGB(156, 165, 255), Enum.Font.GothamBlack, 82)
+    discordFallback.TextXAlignment = Enum.TextXAlignment.Center
+end
+
+label(DiscordGui, 'SATISHUB COMMUNITY', 104, 17, 310, 30, 18, WHITE, Enum.Font.GothamBlack, 82)
+local promoCountdown = label(DiscordGui, 'Closing in 10 seconds', 104, 45, 305, 22, 12, MUTED, Enum.Font.Gotham, 82)
+
+local discordButton = makeButton(DiscordGui, "Don't forget to join our Discord", 104, 76, 312, 48, function(btn)
+    local opened = false
+    local ok, guiService = pcall(function() return game:GetService('GuiService') end)
+    if ok and guiService then
+        opened = pcall(function() guiService:OpenBrowserWindow(DISCORD_INVITE_URL) end)
+    end
+    if opened then
+        btn.Text = 'Discord invitation opened!'
+    elseif type(setclipboard) == 'function' then
+        local copied = pcall(setclipboard, DISCORD_INVITE_URL)
+        btn.Text = copied and 'Invite copied — paste into your browser' or 'discord.gg/WvCUTSDSNT'
+    else
+        btn.Text = 'discord.gg/WvCUTSDSNT'
+    end
+end)
+discordButton.ZIndex = 84
+discordButton.BackgroundColor3 = Color3.fromRGB(70, 81, 195)
+discordButton:SetAttribute('RestColor', discordButton.BackgroundColor3)
+discordButton.TextSize = 13
+
+local promoActive = true
+local function dismissPromo()
+    if not promoActive then return end
+    promoActive = false
+    tween(DiscordGui, TweenInfo.new(0.28, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+        Position = UDim2.new(0.5, 0, 0, -170),
+        BackgroundTransparency = 1,
+    })
+    task.delay(0.30, function()
+        if DiscordGui and DiscordGui.Parent then DiscordGui:Destroy() end
+    end)
+end
+
+tween(DiscordGui, TweenInfo.new(0.48, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+    Position = UDim2.new(0.5, 0, 0, 24),
+})
+task.spawn(function()
+    for seconds = 10, 1, -1 do
+        if not alive or not promoActive then return end
+        promoCountdown.Text = 'Closing in ' .. seconds .. ' seconds'
+        task.wait(1)
+    end
+    if alive then dismissPromo() end
+end)
+
 -- Start minimized: show only the SH icon when the script loads.
 showPage('Combat', true)
 main.Visible = false
@@ -1296,4 +1450,4 @@ env.SatisHubAnimeCleanup = function()
     gui:Destroy()
 end
 
-print('[SatisHub] MD V4.9 loaded; tabs: Combat, Visuals, Movement, Settings; mouse mode locked.')
+print('[SatisHub] MD V5.4 loaded. Rainbow ESP and Discord welcome enabled.')
