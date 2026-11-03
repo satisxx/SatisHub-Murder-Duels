@@ -1,0 +1,190 @@
+-- SATISHUB | 1V1 EDITION (Black & Gold)
+-- RightShift: show/hide | Right Mouse: hold to aim
+-- Client-side UI; game-specific server validation may prevent some effects.
+
+if not game:IsLoaded() then game.Loaded:Wait() end
+local Players = game:GetService('Players')
+local UIS = game:GetService('UserInputService')
+local RunService = game:GetService('RunService')
+local LP = Players.LocalPlayer
+local PG = LP:WaitForChild('PlayerGui')
+local env = (getgenv and getgenv()) or _G
+if type(env.SatisHub1v1Cleanup) == 'function' then pcall(env.SatisHub1v1Cleanup) end
+
+local cfg = {aim=false, fov=140, smooth=0.2, target='Head', walls=true, circle=true, esp=false, noclip=false}
+local gold=Color3.fromRGB(229,178,63)
+local muted=Color3.fromRGB(155,151,143)
+local bg=Color3.fromRGB(10,11,14)
+local panel=Color3.fromRGB(19,20,25)
+local elevated=Color3.fromRGB(30,31,37)
+local white=Color3.fromRGB(237,235,228)
+local green=Color3.fromRGB(122,217,156)
+local red=Color3.fromRGB(220,116,116)
+local connections, highlights, collisions = {}, {}, {}
+local held, active = false, true
+local function connect(signal, fn) local c=signal:Connect(fn); table.insert(connections,c); return c end
+local function addCorner(obj,r) local c=Instance.new('UICorner');c.CornerRadius=UDim.new(0,r);c.Parent=obj end
+local function addStroke(obj,col,size) local s=Instance.new('UIStroke');s.Color=col;s.Thickness=size or 1;s.Parent=obj;return s end
+local function label(parent, txt, pos, size, font, color, textSize)
+    local v=Instance.new('TextLabel');v.BackgroundTransparency=1;v.Text=txt;v.Position=pos;v.Size=size;v.Font=font or Enum.Font.Gotham;v.TextSize=textSize or 13;v.TextColor3=color or white;v.TextXAlignment=Enum.TextXAlignment.Left;v.Parent=parent;return v
+end
+local function box(parent, pos, size, color)
+    local v=Instance.new('Frame');v.BorderSizePixel=0;v.Position=pos;v.Size=size;v.BackgroundColor3=color;v.Parent=parent;return v
+end
+
+local gui=Instance.new('ScreenGui');gui.Name='SatisHub_1v1';gui.IgnoreGuiInset=true;gui.ResetOnSpawn=false;gui.DisplayOrder=888;gui.Parent=PG
+local main=box(gui,UDim2.new(.5,-285,.5,-205),UDim2.fromOffset(570,410),bg);addCorner(main,13);addStroke(main,Color3.fromRGB(76,62,40),1)
+local top=box(main,UDim2.fromOffset(0,0),UDim2.new(1,0,0,60),panel);addCorner(top,13)
+box(top,UDim2.fromOffset(0,58),UDim2.new(1,0,0,2),gold)
+label(top,'SH',UDim2.fromOffset(18,9),UDim2.fromOffset(52,42),Enum.Font.GothamBlack,gold,30)
+label(top,'SATISHUB',UDim2.fromOffset(77,11),UDim2.fromOffset(190,21),Enum.Font.GothamBold,white,17)
+label(top,'1V1 EDITION  /  BLACK & GOLD',UDim2.fromOffset(78,32),UDim2.fromOffset(270,16),Enum.Font.Gotham,muted,10)
+local close=Instance.new('TextButton');close.BackgroundTransparency=1;close.Position=UDim2.new(1,-47,0,9);close.Size=UDim2.fromOffset(35,35);close.Text='×';close.Font=Enum.Font.GothamBold;close.TextSize=26;close.TextColor3=muted;close.Parent=top
+local sidebar=box(main,UDim2.fromOffset(0,60),UDim2.fromOffset(148,350),panel)
+local content=box(main,UDim2.fromOffset(148,60),UDim2.fromOffset(422,350),bg)
+label(sidebar,'CONTROLS',UDim2.fromOffset(15,17),UDim2.fromOffset(120,20),Enum.Font.GothamBold,muted,10)
+local tabs={'Combat','Visuals','Movement','Settings'}
+local tabButtons, pages = {}, {}
+local selectedTab='Combat'
+local title
+for i,name in ipairs(tabs) do
+    local b=Instance.new('TextButton');b.Size=UDim2.fromOffset(130,40);b.Position=UDim2.fromOffset(9,46+(i-1)*48);b.BackgroundColor3=(i==1 and elevated or panel);b.Text='  '..name;b.TextXAlignment=Enum.TextXAlignment.Left;b.Font=Enum.Font.GothamBold;b.TextSize=13;b.TextColor3=(i==1 and gold or muted);b.BorderSizePixel=0;b.Parent=sidebar;addCorner(b,7);tabButtons[name]=b
+    local page=Instance.new('ScrollingFrame');page.Size=UDim2.new(1,-32,1,-62);page.Position=UDim2.fromOffset(16,56);page.BorderSizePixel=0;page.BackgroundTransparency=1;page.ScrollBarThickness=3;page.ScrollBarImageColor3=gold;page.AutomaticCanvasSize=Enum.AutomaticSize.Y;page.CanvasSize=UDim2.new();page.Visible=(i==1);page.Parent=content
+    local flow=Instance.new('UIListLayout');flow.Padding=UDim.new(0,9);flow.SortOrder=Enum.SortOrder.LayoutOrder;flow.Parent=page
+    pages[name]=page
+    connect(b.MouseButton1Click,function()
+        selectedTab=name
+        for tab,btn in pairs(tabButtons) do btn.BackgroundColor3=(tab==name and elevated or panel);btn.TextColor3=(tab==name and gold or muted);pages[tab].Visible=(tab==name) end
+        title.Text=name:upper()
+    end)
+end
+label(sidebar,'RIGHT SHIFT  •  HIDE',UDim2.fromOffset(13,316),UDim2.fromOffset(125,20),Enum.Font.Gotham,muted,9)
+title=label(content,'COMBAT',UDim2.fromOffset(17,18),UDim2.fromOffset(280,25),Enum.Font.GothamBlack,gold,20)
+label(content,'SH  /  1V1',UDim2.new(1,-105,0,20),UDim2.fromOffset(90,20),Enum.Font.Gotham,muted,10)
+
+local function toggle(page,text,key)
+    local row=box(page,UDim2.new(),UDim2.new(1,-5,0,46),panel);addCorner(row,8)
+    label(row,text,UDim2.fromOffset(13,0),UDim2.new(1,-100,1,0),Enum.Font.GothamBold,white,12)
+    local b=Instance.new('TextButton');b.Size=UDim2.fromOffset(64,27);b.Position=UDim2.new(1,-76,.5,-13);b.BorderSizePixel=0;b.Font=Enum.Font.GothamBold;b.TextSize=11;b.Parent=row;addCorner(b,7)
+    local function refresh() b.Text=cfg[key] and 'ON' or 'OFF';b.TextColor3=cfg[key] and green or red;b.BackgroundColor3=elevated end
+    connect(b.MouseButton1Click,function()cfg[key]=not cfg[key];refresh();if key=='noclip' and not cfg[key] then for part,old in pairs(collisions) do if part.Parent then part.CanCollide=old end end;table.clear(collisions) end end)
+    refresh()
+end
+local function stepper(page,text,key,min,max,step,format)
+    local row=box(page,UDim2.new(),UDim2.new(1,-5,0,50),panel);addCorner(row,8)
+    label(row,text,UDim2.fromOffset(13,5),UDim2.fromOffset(200,18),Enum.Font.GothamBold,white,12)
+    local display=label(row,'',UDim2.fromOffset(13,24),UDim2.fromOffset(110,19),Enum.Font.Gotham,gold,12)
+    local function change(delta) cfg[key]=math.clamp(math.floor((cfg[key]+delta)*1000+.5)/1000,min,max);display.Text=string.format(format,cfg[key]) end
+    for i,option in ipairs({{'−',-step},{'+',step}}) do
+        local b=Instance.new('TextButton');b.Size=UDim2.fromOffset(36,30);b.Position=UDim2.new(1,-86+(i-1)*43,.5,-15);b.BackgroundColor3=elevated;b.BorderSizePixel=0;b.Text=option[1];b.TextColor3=gold;b.TextSize=18;b.Font=Enum.Font.GothamBold;b.Parent=row;addCorner(b,6);connect(b.MouseButton1Click,function()change(option[2]) end)
+    end
+    change(0)
+end
+local function action(page,text,callback)
+    local b=Instance.new('TextButton');b.Size=UDim2.new(1,-5,0,42);b.BackgroundColor3=panel;b.BorderSizePixel=0;b.Text=text;b.TextColor3=white;b.Font=Enum.Font.GothamBold;b.TextSize=12;b.Parent=page;addCorner(b,8);connect(b.MouseButton1Click,function()callback(b)end);return b
+end
+
+toggle(pages.Combat,'Aimbot  ·  Hold RMB','aim')
+stepper(pages.Combat,'FOV radius (pixels)','fov',30,400,10,'%d px')
+stepper(pages.Combat,'Aim smoothness','smooth',.05,1,.05,'%.2f')
+action(pages.Combat,'Target part: Head',function(b)cfg.target=(cfg.target=='Head' and 'HumanoidRootPart' or 'Head');b.Text='Target part: '..(cfg.target=='Head' and 'Head' or 'Torso')end)
+toggle(pages.Combat,'Wall check','walls')
+toggle(pages.Visuals,'Player highlights (ESP)','esp')
+toggle(pages.Visuals,'Show FOV circle','circle')
+toggle(pages.Movement,'Noclip','noclip')
+local info=label(pages.Settings,'Keybinds: RightShift toggles the menu.\nAim: hold right mouse button.\n\nAuto-execute on teleport is not enabled:\nit requires a documented, trusted API\nfrom your execution environment.',UDim2.new(),UDim2.new(1,-10,0,125),Enum.Font.Gotham,muted,12)
+info.TextWrapped=true;info.TextYAlignment=Enum.TextYAlignment.Top
+
+local fov=Instance.new('Frame');fov.AnchorPoint=Vector2.new(.5,.5);fov.BackgroundTransparency=1;fov.Parent=gui;addCorner(fov,999);addStroke(fov,gold,1.5)
+local function clearESP()
+    for p,h in pairs(highlights) do if h then h:Destroy() end;highlights[p]=nil end
+end
+local function refreshESP()
+    if not cfg.esp then clearESP();return end
+    for _,p in ipairs(Players:GetPlayers()) do
+        if p ~= LP then
+            local char=p.Character
+            if highlights[p] and (not char or highlights[p].Adornee ~= char) then highlights[p]:Destroy();highlights[p]=nil end
+            if char and not highlights[p] then
+                local h=Instance.new('Highlight');h.Name='SH_DuelHighlight';h.Adornee=char;h.FillColor=gold;h.OutlineColor=white;h.FillTransparency=.7;h.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop;h.Parent=gui;highlights[p]=h
+            end
+        end
+    end
+    for p,h in pairs(highlights) do if not p.Parent then h:Destroy();highlights[p]=nil end end
+end
+local function findTarget()
+    local cam=workspace.CurrentCamera
+    if not cam then return nil end
+    local mouse=UIS:GetMouseLocation()
+    local best,dist=nil,cfg.fov
+    for _,p in ipairs(Players:GetPlayers()) do
+        if p ~= LP and p.Character then
+            local char=p.Character
+            local hum=char:FindFirstChildOfClass('Humanoid')
+            local part=char:FindFirstChild(cfg.target)
+            if hum and hum.Health > 0 and part then
+                local pos,visible=cam:WorldToViewportPoint(part.Position)
+                local d=(Vector2.new(pos.X,pos.Y)-mouse).Magnitude
+                if visible and pos.Z>0 and d<dist then
+                    local allowed=true
+                    if cfg.walls then
+                        local param=RaycastParams.new();param.FilterType=Enum.RaycastFilterType.Exclude;param.FilterDescendantsInstances={LP.Character or cam}
+                        local hit=workspace:Raycast(cam.CFrame.Position,part.Position-cam.CFrame.Position,param)
+                        allowed=(hit==nil or hit.Instance:IsDescendantOf(char))
+                    end
+                    if allowed then best=part;dist=d end
+                end
+            end
+        end
+    end
+    return best
+end
+connect(UIS.InputBegan,function(input,processed)
+    if input.UserInputType==Enum.UserInputType.MouseButton2 then held=true end
+    if not processed and input.KeyCode==Enum.KeyCode.RightShift then main.Visible=not main.Visible end
+end)
+connect(UIS.InputEnded,function(input)if input.UserInputType==Enum.UserInputType.MouseButton2 then held=false end end)
+connect(close.MouseButton1Click,function()main.Visible=false end)
+connect(RunService.Stepped,function()
+    if not cfg.noclip then return end
+    local char=LP.Character;if not char then return end
+    for _,v in ipairs(char:GetDescendants()) do
+        if v:IsA('BasePart') then
+            if collisions[v]==nil then collisions[v]=v.CanCollide end
+            v.CanCollide=false
+        end
+    end
+end)
+connect(LP.CharacterRemoving,function() table.clear(collisions) end)
+connect(RunService.RenderStepped,function()
+    if not active then return end
+    local mouse=UIS:GetMouseLocation();fov.Position=UDim2.fromOffset(mouse.X,mouse.Y);fov.Size=UDim2.fromOffset(cfg.fov*2,cfg.fov*2);fov.Visible=cfg.aim and cfg.circle
+    if cfg.aim and held then
+        local cam=workspace.CurrentCamera;local target=findTarget()
+        if cam and target then cam.CFrame=cam.CFrame:Lerp(CFrame.lookAt(cam.CFrame.Position,target.Position),cfg.smooth) end
+    end
+end)
+local espElapsed=0
+connect(RunService.Heartbeat,function(dt)espElapsed=espElapsed+dt;if espElapsed>.35 then espElapsed=0;refreshESP()end end)
+
+-- Drag from header (doesn't interfere with tabs/buttons)
+local dragging,startInput,startPos=false,nil,nil
+connect(top.InputBegan,function(input)
+    if input.UserInputType==Enum.UserInputType.MouseButton1 then dragging=true;startInput=input.Position;startPos=main.Position end
+end)
+connect(UIS.InputChanged,function(input)
+    if dragging and input.UserInputType==Enum.UserInputType.MouseMovement then
+        local d=input.Position-startInput
+        main.Position=UDim2.new(startPos.X.Scale,startPos.X.Offset+d.X,startPos.Y.Scale,startPos.Y.Offset+d.Y)
+    end
+end)
+connect(UIS.InputEnded,function(input)if input.UserInputType==Enum.UserInputType.MouseButton1 then dragging=false end end)
+
+env.SatisHub1v1Cleanup=function()
+    active=false;cfg.noclip=false;clearESP()
+    for p,old in pairs(collisions) do if p.Parent then p.CanCollide=old end end
+    table.clear(collisions)
+    for _,c in ipairs(connections) do c:Disconnect() end
+    gui:Destroy()
+end
+print('[SatisHub] 1v1 Edition loaded')
