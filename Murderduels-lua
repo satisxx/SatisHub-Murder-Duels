@@ -1,5 +1,5 @@
--- SATISHUB | MURDER DUELS | V4.3
--- Anime Transparent / Meliodas Black & Gold UI
+-- SATISHUB | MURDER DUELS | V4.5
+-- MD 3D emblem / Meliodas anime background / Black & Gold UI
 -- RightShift = show/hide | Auto Execute on Teleport = always ON
 -- Features: Aimbot, ESP, Noclip, saved settings, page animations, minimize bar, anime-style transparent UI.
 -- Put a Meliodas image asset id below or place SatisHub_Meliodas_background.png in executor workspace.
@@ -21,6 +21,8 @@ if type(env.SatisHubAnimeCleanup) == 'function' then pcall(env.SatisHubAnimeClea
 local RAW_URL = 'https://raw.githubusercontent.com/satisxx/SatisHub-Murder-Duels/main/Murderduels-lua'
 local BACKGROUND_ASSET_ID = '0'
 local BACKGROUND_FILE = 'SatisHub_Meliodas_background.png'
+local MD_LOGO_ASSET_ID = '0' -- optional Roblox image asset ID for metallic MD logo
+local MD_LOGO_FILE = 'SatisHub_MD_3D.png' -- optional local image in executor workspace
 local SETTINGS_FILE = 'SatisHub_Anime_Config.json'
 
 local GOLD = Color3.fromRGB(255, 198, 56)
@@ -46,7 +48,7 @@ local defaults = {
     esp = false,
     noclip = false,
     autoTeleport = true,
-    aimMethod = 'Camera',
+    aimMethod = 'Mouse', -- fixed internally; no UI control
     longRange = true,
 }
 
@@ -71,16 +73,26 @@ cfg.autoTeleport = true
 cfg.fov = math.clamp(cfg.fov, 30, 850)
 cfg.smooth = math.clamp(cfg.smooth, 0.03, 1)
 if cfg.aimPart ~= 'Head' and cfg.aimPart ~= 'HumanoidRootPart' then cfg.aimPart = 'Head' end
-if cfg.aimMethod ~= 'Camera' and cfg.aimMethod ~= 'Mouse' then cfg.aimMethod = 'Camera' end
+-- A saved configuration or teleport payload cannot change this mode.
+cfg.aimMethod = 'Mouse'
 
+-- Local persistence when readfile/writefile are available. The same path is kept
+-- as V4.4, so an existing configuration is not lost when updating.
+local savedToFile = false
 local function saveSettings()
     cfg.autoTeleport = true
+    cfg.aimMethod = 'Mouse'
     env.SatisHubAnimeCurrent = cfg
     if type(writefile) == 'function' then
-        pcall(function()
+        local ok, err = pcall(function()
             writefile(SETTINGS_FILE, HttpService:JSONEncode(cfg))
         end)
+        savedToFile = ok
+        if not ok then
+            warn('[SatisHub] Could not save options:', tostring(err))
+        end
     end
+    return savedToFile
 end
 
 local connections, highlights, original = {}, {}, {}
@@ -199,7 +211,7 @@ local function makeButton(parent, value, x, y, w, h, fn)
 end
 
 local gui = Instance.new('ScreenGui')
-gui.Name = 'SatisHub_Anime_V4_3'
+gui.Name = 'SatisHub_MD_V4_5'
 gui.IgnoreGuiInset = true
 gui.ResetOnSpawn = false
 gui.DisplayOrder = 950
@@ -218,10 +230,10 @@ local backdrop = Instance.new('ImageLabel')
 backdrop.Name = 'AnimeBackground'
 backdrop.BorderSizePixel = 0
 backdrop.BackgroundTransparency = 1
-backdrop.Position = UDim2.fromOffset(520, 0)
-backdrop.Size = UDim2.fromOffset(410, 540)
+backdrop.Position = UDim2.fromOffset(0, 0)
+backdrop.Size = UDim2.fromOffset(930, 540)
 backdrop.ScaleType = Enum.ScaleType.Crop
-backdrop.ImageTransparency = 0.18
+backdrop.ImageTransparency = 0.06
 backdrop.ZIndex = 2
 backdrop.Parent = main
 
@@ -241,22 +253,82 @@ else
         end
     end
 end
-local fallback = label(main, 'SH', 680, 118, 170, 240, 118, Color3.fromRGB(103, 73, 23), Enum.Font.GothamBlack, 2)
+local fallback = label(main, 'MD', 650, 118, 210, 240, 118, Color3.fromRGB(103, 73, 23), Enum.Font.GothamBlack, 2)
 fallback.TextXAlignment = Enum.TextXAlignment.Center
 fallback.TextTransparency = 0.16
 fallback.Visible = not hasPicture
-local shade = frame(main, 185, 0, 745, 540, BG, 3, 0.56)
+if not hasPicture then
+    warn('[SatisHub] Fundo do Meliodas indisponivel: coloca '..BACKGROUND_FILE..' no workspace do executor ou define BACKGROUND_ASSET_ID.')
+end
+local shade = frame(main, 185, 0, 745, 540, BG, 3, 0.72)
 
-local sidebar = frame(main, 0, 0, 190, 540, BG, 5, 0.15)
+local sidebar = frame(main, 0, 0, 190, 540, BG, 5, 0.32)
 frame(main, 189, 0, 1, 540, GOLD, 7, 0.45)
 label(sidebar, 'SatisHub', 20, 20, 160, 48, 27, PALE, Enum.Font.GothamBlack)
 label(sidebar, 'MURDER DUELS  |  1V1', 22, 70, 164, 18, 10, WHITE, Enum.Font.GothamBold)
-local badge = frame(sidebar, 18, 103, 156, 31, Color3.fromRGB(45, 30, 8), 6, 0.12)
-rounded(badge, 15)
-stroke(badge, GOLD, 1, 0.05)
-label(badge, '⚔  MELIODAS EDITION', 10, 2, 138, 25, 10, GOLD, Enum.Font.GothamBold).TextXAlignment = Enum.TextXAlignment.Center
-label(sidebar, 'MD', 38, 454, 120, 60, 55, GOLD, Enum.Font.GothamBlack)
-label(sidebar, 'ANIME BLACK & GOLD', 21, 506, 160, 14, 10, MUTED)
+-- 3D MD emblem: multiple offset layers give visible depth, with a gold highlight and a glowing orbit.
+local emblemOrbit = frame(sidebar, 15, 104, 160, 59, BG, 6, 1)
+rounded(emblemOrbit, 100)
+stroke(emblemOrbit, GOLD, 1.5, 0.20)
+local orbitGlow = frame(sidebar, 12, 101, 166, 65, BG, 6, 1)
+local mdFallbackParts = {emblemOrbit, orbitGlow}
+rounded(orbitGlow, 100)
+stroke(orbitGlow, GOLD, 4, 0.78)
+for depth = 6, 1, -1 do
+    local shadow = label(sidebar, 'MD', 42 + depth, 96 + depth, 120, 72, 57,
+        Color3.fromRGB(36 + depth * 8, 20 + depth * 4, 5), Enum.Font.GothamBlack, 7)
+    shadow.TextXAlignment = Enum.TextXAlignment.Center
+    table.insert(mdFallbackParts, shadow)
+end
+local emblem = label(sidebar, 'MD', 42, 96, 120, 72, 57, GOLD, Enum.Font.GothamBlack, 8)
+emblem.TextXAlignment = Enum.TextXAlignment.Center
+table.insert(mdFallbackParts, emblem)
+stroke(emblem, Color3.fromRGB(55, 28, 3), 1.8, 0.08)
+local goldGradient = Instance.new('UIGradient')
+goldGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0.00, Color3.fromRGB(255, 249, 217)),
+    ColorSequenceKeypoint.new(0.40, Color3.fromRGB(255, 205, 59)),
+    ColorSequenceKeypoint.new(0.72, Color3.fromRGB(179, 99, 10)),
+    ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255, 220, 120))
+})
+goldGradient.Rotation = 85
+goldGradient.Parent = emblem
+local starLeft = label(sidebar, '✦', 17, 118, 24, 26, 17, GOLD, Enum.Font.GothamBold, 8)
+local starRight = label(sidebar, '✦', 158, 131, 22, 23, 13, GOLD, Enum.Font.GothamBold, 8)
+table.insert(mdFallbackParts, starLeft)
+table.insert(mdFallbackParts, starRight)
+local glint = Instance.new('UIGradient')
+glint.Color = ColorSequence.new(Color3.fromRGB(255, 205, 70), Color3.fromRGB(116, 66, 14))
+glint.Parent = orbitGlow
+
+-- Prefer the real metallic 3D MD artwork when available, with the layered label as fallback.
+local mdLogo = Instance.new('ImageLabel')
+mdLogo.Name = 'MD_3D_Logo'
+mdLogo.BackgroundTransparency = 1
+mdLogo.BorderSizePixel = 0
+mdLogo.Position = UDim2.fromOffset(15, 95)
+mdLogo.Size = UDim2.fromOffset(165, 79)
+mdLogo.ScaleType = Enum.ScaleType.Fit
+mdLogo.ZIndex = 10
+mdLogo.Visible = false
+mdLogo.Parent = sidebar
+local logoAsset = nil
+if MD_LOGO_ASSET_ID ~= '' and MD_LOGO_ASSET_ID ~= '0' then
+    logoAsset = 'rbxassetid://' .. MD_LOGO_ASSET_ID
+else
+    local converter = type(getcustomasset) == 'function' and getcustomasset or nil
+    if not converter and type(getsynasset) == 'function' then converter = getsynasset end
+    if converter then
+        local ok, result = pcall(converter, MD_LOGO_FILE)
+        if ok and type(result) == 'string' then logoAsset = result end
+    end
+end
+if logoAsset then
+    mdLogo.Image = logoAsset
+    mdLogo.Visible = true
+    for _, part in ipairs(mdFallbackParts) do part.Visible = false end
+end
+label(sidebar, 'BLACK  /  GOLD', 21, 503, 158, 17, 10, MUTED, Enum.Font.GothamBold)
 
 local pageTitle = label(main, 'COMBAT', 212, 18, 350, 39, 24, WHITE, Enum.Font.GothamBlack)
 local pageSubtitle = label(main, 'ANIME THEME   •   TRANSPARENT UI', 213, 60, 430, 17, 11, GOLD, Enum.Font.GothamBold)
@@ -265,7 +337,7 @@ miniBar = frame(gui, 18, 18, 255, 48, BG, 20, 0.10)
 miniBar.Visible = false
 rounded(miniBar, 13)
 stroke(miniBar, GOLD, 2, 0.08)
-label(miniBar, 'SatisHub  •  Meliodas', 14, 0, 160, 48, 14, GOLD, Enum.Font.GothamBold, 21)
+label(miniBar, 'SatisHub  •  MD', 14, 0, 160, 48, 14, GOLD, Enum.Font.GothamBold, 21)
 makeButton(miniBar, 'Open', 180, 9, 60, 30, function()
     miniBar.Visible = false
     main.Visible = true
@@ -295,11 +367,11 @@ local statusStrip = frame(main, 202, 499, 706, 28, Color3.fromRGB(6, 7, 10), 9, 
 rounded(statusStrip, 9)
 stroke(statusStrip, Color3.fromRGB(99, 76, 35), 1, 0.25)
 statusText = label(statusStrip, '●  SATISHUB LOADED', 13, 1, 350, 26, 11, GREEN, Enum.Font.GothamBold, 10)
-local tinyText = label(statusStrip, 'Murder Duels   •   V4.3', 520, 1, 170, 26, 11, MUTED, Enum.Font.GothamBold, 10)
+local tinyText = label(statusStrip, 'Murder Duels   •   V4.5', 520, 1, 170, 26, 11, MUTED, Enum.Font.GothamBold, 10)
 tinyText.TextXAlignment = Enum.TextXAlignment.Right
 
-local navNames = {'Combat', 'Visuals', 'Movement', 'Teleport', 'Settings'}
-local navIcons = {'✦', '◈', '➜', '⇄', '⚙'}
+local navNames = {'Combat', 'Visuals', 'Movement', 'Settings'}
+local navIcons = {'✦', '◈', '➜', '⚙'}
 local navButtons, pages = {}, {}
 local pagePositions = {
     base = UDim2.fromOffset(202, 96),
@@ -310,12 +382,11 @@ local pageSubtitles = {
     Combat = 'ANIME THEME   •   AIMBOT',
     Visuals = 'TRANSPARENT UI   •   VISUALS',
     Movement = 'MOVEMENT   •   NOCLIP',
-    Teleport = 'AUTO TELEPORT   •   SETTINGS SAVE',
     Settings = 'SATISHUB   •   UI SETTINGS',
 }
 
 for i, name in ipairs(navNames) do
-    local buttonObj = makeButton(sidebar, navIcons[i] .. '   ' .. name, 15, 156 + (i - 1) * 58, 160, 46, function()
+    local buttonObj = makeButton(sidebar, navIcons[i] .. '   ' .. name, 15, 181 + (i - 1) * 55, 160, 45, function()
         if name == currentPage then return end
         local incoming = pages[name]
         local outgoing = currentPage and pages[currentPage] or nil
@@ -349,7 +420,7 @@ for i, name in ipairs(navNames) do
         incoming.BackgroundTransparency = 1
         tween(incoming, TweenInfo.new(0.22, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
             Position = pagePositions.base,
-            BackgroundTransparency = 0.92,
+            BackgroundTransparency = 0.95,
         })
     end)
     buttonObj.TextXAlignment = Enum.TextXAlignment.Left
@@ -358,7 +429,7 @@ for i, name in ipairs(navNames) do
 end
 
 for _, name in ipairs(navNames) do
-    local page = frame(main, 202, 96, 708, 388, BG, 5, 0.92)
+    local page = frame(main, 202, 96, 708, 388, BG, 5, 0.95)
     page.Visible = false
     page.ClipsDescendants = true
     pages[name] = page
@@ -367,7 +438,7 @@ end
 local function card(parent, x, y, w, h, titleText)
     local cardGlow = glow(parent, x - 4, y - 4, w + 8, h + 8, GOLD, 0.92, 5)
     cardGlow.BackgroundTransparency = 0.95
-    local c = frame(parent, x, y, w, h, Color3.fromRGB(12, 12, 14), 6, 0.14)
+    local c = frame(parent, x, y, w, h, Color3.fromRGB(12, 12, 14), 6, 0.32)
     rounded(c, 14)
     stroke(c, Color3.fromRGB(221, 165, 46), 1, 0.12)
     label(c, titleText, 16, 13, w - 24, 30, 17, WHITE, Enum.Font.GothamBold, 8)
@@ -383,7 +454,7 @@ end
 
 local function makeToggle(parent, caption, key, x, y, width)
     width = width or 278
-    local row = frame(parent, x, y, width, 44, PANEL, 7, 0.20)
+    local row = frame(parent, x, y, width, 44, PANEL, 7, 0.27)
     rounded(row, 10)
     stroke(row, Color3.fromRGB(92, 72, 44), 1, 0.45)
     label(row, caption, 12, 4, width - 88, 36, 12, WHITE, Enum.Font.GothamBold, 8)
@@ -408,7 +479,7 @@ local function makeToggle(parent, caption, key, x, y, width)
 end
 
 local function makeSlider(parent, caption, key, x, y, width, minimum, maximum, decimals)
-    local holder = frame(parent, x, y, width, 78, PANEL, 7, 0.18)
+    local holder = frame(parent, x, y, width, 78, PANEL, 7, 0.28)
     rounded(holder, 10)
     stroke(holder, Color3.fromRGB(92, 72, 44), 1, 0.40)
     label(holder, caption, 12, 8, width - 102, 23, 12, WHITE, Enum.Font.GothamBold, 9)
@@ -451,7 +522,7 @@ local function makeSlider(parent, caption, key, x, y, width, minimum, maximum, d
 end
 
 local function makeChoice(parent, caption, options, key, x, y, width)
-    local holder = frame(parent, x, y, width, 44, PANEL, 7, 0.18)
+    local holder = frame(parent, x, y, width, 44, PANEL, 7, 0.28)
     rounded(holder, 10)
     stroke(holder, Color3.fromRGB(92, 72, 44), 1, 0.45)
     label(holder, caption, 12, 4, 145, 35, 12, WHITE, Enum.Font.GothamBold, 8)
@@ -504,30 +575,14 @@ makeToggle(moveCard, 'Noclip', 'noclip', 18, 94, 672)
 local moveNote = label(moveCard, 'The server may restore your position or collision.', 18, 156, 650, 48, 12, MUTED)
 moveNote.TextWrapped = true
 
--- TELEPORT
-local teleportPage = pages.Teleport
-local tpCard = card(teleportPage, 0, 0, 708, 305, '⇄  Teleport / Persistent Settings')
-label(tpCard, 'Re-run SatisHub after moving to another place or server.', 18, 48, 660, 29, 12, MUTED)
-local mandatoryLabel = label(tpCard, 'AUTO EXECUTE ON TELEPORT   •   ALWAYS ON', 18, 92, 660, 40, 15, GREEN, Enum.Font.GothamBold)
-mandatoryLabel.TextWrapped = true
-local function getQueue()
-    if type(queue_on_teleport) == 'function' then return queue_on_teleport end
-    if type(syn) == 'table' and type(syn.queue_on_teleport) == 'function' then return syn.queue_on_teleport end
-    return nil
-end
-label(tpCard, getQueue() and 'Teleport queue API: available' or 'Teleport queue API: not detected', 19, 159, 640, 28, 12, getQueue() and GREEN or RED, Enum.Font.GothamBold)
-local tpNote = label(tpCard, 'Your settings are saved locally when possible, and the script queues itself again for teleports.', 19, 200, 648, 58, 12, MUTED)
-tpNote.TextWrapped = true
-
 -- SETTINGS
 local settings = pages.Settings
 local settingsCard = card(settings, 0, 0, 708, 330, '⚙  SatisHub Settings')
-makeChoice(settingsCard, 'Aim method', {'Camera', 'Mouse'}, 'aimMethod', 18, 64, 672)
-local info1 = label(settingsCard, 'Camera mode rotates the view. Mouse mode requires mousemoverel.', 18, 122, 656, 44, 12, MUTED)
-info1.TextWrapped = true
-label(settingsCard, 'Right Shift = show / hide the menu', 18, 184, 640, 27, 12, GOLD)
-label(settingsCard, 'The minimize button keeps a small restore bar on screen.', 18, 223, 650, 27, 12, WHITE)
-label(settingsCard, 'The whole design uses a transparent anime black & gold style.', 18, 262, 660, 27, 12, WHITE)
+label(settingsCard, 'Right Shift = show / hide the menu', 18, 80, 640, 27, 13, GOLD)
+label(settingsCard, 'The minimize button keeps a small restore bar on screen.', 18, 132, 650, 27, 12, WHITE)
+label(settingsCard, 'Options are saved automatically when you change them.', 18, 183, 650, 27, 12, WHITE)
+local savedNote = label(settingsCard, 'Settings return after server changes when supported by the executor.', 18, 227, 650, 47, 12, MUTED)
+savedNote.TextWrapped = true
 
 -- FOV overlay
 local fov = frame(gui, 0, 0, 1, 1, GOLD, 3, 1)
@@ -620,7 +675,7 @@ local okBind, errBind = pcall(function()
         local centre = Vector2.new(vs.X / 2, vs.Y / 2)
         fov.Size = UDim2.fromOffset(cfg.fov * 2, cfg.fov * 2)
         fov.Position = UDim2.fromOffset(centre.X, centre.Y)
-        fov.Visible = cfg.aim and cfg.circle and not cfg.longRange
+        fov.Visible = cfg.aim and cfg.circle and not cfg.longRange and not main.Visible
         if not cfg.aim then
             targetText.Text = 'TARGET: none'
             return
@@ -630,12 +685,10 @@ local okBind, errBind = pcall(function()
             local model = part:FindFirstAncestorOfClass('Model')
             local name = model and model.Name or 'unknown'
             targetText.Text = 'TARGET: ' .. name
-            if cfg.aimMethod == 'Mouse' and type(mousemoverel) == 'function' and screenPosition then
+            -- Mouse is the only allowed aiming method in this version.
+            if type(mousemoverel) == 'function' and screenPosition then
                 local offset = screenPosition - centre
                 pcall(mousemoverel, offset.X * cfg.smooth, offset.Y * cfg.smooth)
-            else
-                local desired = CFrame.lookAt(cam.CFrame.Position, part.Position)
-                cam.CFrame = cam.CFrame:Lerp(desired, cfg.smooth)
             end
         else
             targetText.Text = cfg.longRange and 'TARGET: none visible' or 'TARGET: none in FOV'
@@ -663,17 +716,26 @@ bind(RunService.Heartbeat, function(dt)
     if espTime > 0.35 then espTime = 0; refreshESP() end
 end)
 
--- Queue once, at startup, to avoid duplicate bootstrap executions.
--- The queued code first reads the latest saved settings, so changes after
- -- queue registration persist without queuing the same script repeatedly.
+-- Auto-execution is internal and has no menu entry.
+-- If file I/O works, register one bootstrap immediately: it reads the LATEST
+-- config on arrival. Without file I/O, queue only when teleport starts, taking
+-- a fresh snapshot then. Both paths avoid registering duplicate bootstraps.
+local function getQueue()
+    if type(queue_on_teleport) == 'function' then return queue_on_teleport end
+    if type(syn) == 'table' and type(syn.queue_on_teleport) == 'function' then
+        return syn.queue_on_teleport
+    end
+    return nil
+end
 local teleportQueued = false
 local function scheduleAfterTeleport()
     if teleportQueued then return true end
     cfg.autoTeleport = true
+    cfg.aimMethod = 'Mouse'
     saveSettings()
     local q = getQueue()
     if type(q) ~= 'function' then
-        warn('[SatisHub] Auto teleport unavailable: queue_on_teleport not supported.')
+        warn('[SatisHub] Auto execute unsupported: queue_on_teleport is unavailable.')
         return false
     end
     local snapshot = HttpService:JSONEncode(cfg)
@@ -681,37 +743,46 @@ local function scheduleAfterTeleport()
 local ok, err = pcall(function()
     if not game:IsLoaded() then game.Loaded:Wait() end
     local env = (type(getgenv) == 'function' and getgenv()) or _G
-    local settings = game:GetService('HttpService'):JSONDecode(%q)
+    local service = game:GetService('HttpService')
+    local options = service:JSONDecode(%q)
     if type(readfile) == 'function' then
         pcall(function()
-            local saved = game:GetService('HttpService'):JSONDecode(readfile(%q))
+            local saved = service:JSONDecode(readfile(%q))
             if type(saved) == 'table' then
-                for k, v in pairs(settings) do
-                    if type(saved[k]) == type(v) then settings[k] = saved[k] end
+                for key, expected in pairs(options) do
+                    if type(saved[key]) == type(expected) then
+                        options[key] = saved[key]
+                    end
                 end
             end
         end)
     end
-    settings.autoTeleport = true
-    env.SatisHubAnimeSeed = settings
+    options.autoTeleport = true
+    options.aimMethod = 'Mouse'
+    env.SatisHubAnimeSeed = options
     local source = game:HttpGet(%q)
-    local fn, compileError = loadstring(source)
-    assert(type(fn) == 'function', tostring(compileError or 'unknown compile error'))
-    fn()
+    local func, compileError = loadstring(source)
+    assert(type(func) == 'function', tostring(compileError or 'compile error'))
+    func()
 end)
-if not ok then warn('[SatisHub] Error loading after teleport:', err) end
+if not ok then warn('[SatisHub] Failed to load after server change:', tostring(err)) end
 ]], snapshot, SETTINGS_FILE, RAW_URL)
     local ok, err = pcall(q, bootstrap)
-    if ok then
-        teleportQueued = true
-        print('[SatisHub] Auto Execute queued. Saved settings will reload when available.')
-        return true
+    if not ok then
+        warn('[SatisHub] Could not queue execution:', tostring(err))
+        return false
     end
-    warn('[SatisHub] Could not queue autoexecute:', err)
-    return false
+    teleportQueued = true
+    print('[SatisHub] Re-execution queued with saved options.')
+    return true
 end
-scheduleAfterTeleport()
--- Save the latest state when teleport begins; do not register a second copy.
+
+local filePersistence = saveSettings()
+if filePersistence and type(readfile) == 'function' then
+    scheduleAfterTeleport()
+else
+    print('[SatisHub] File settings unavailable; capturing options at teleport start if supported.')
+end
 bind(LP.OnTeleport, function(state)
     if state == Enum.TeleportState.Started then
         saveSettings()
@@ -760,7 +831,7 @@ currentPage = 'Combat'
 for tabName, page in pairs(pages) do
     page.Visible = (tabName == 'Combat')
     page.Position = pagePositions.base
-    page.BackgroundTransparency = 0.92
+    page.BackgroundTransparency = 0.95
 end
 navButtons.Combat.BackgroundColor3 = Color3.fromRGB(111, 72, 15)
 navButtons.Combat.TextColor3 = GOLD
@@ -777,4 +848,4 @@ env.SatisHubAnimeCleanup = function()
     gui:Destroy()
 end
 
-print('[SatisHub] Anime Transparent V4.3 loaded.')
+print('[SatisHub] MD V4.5 loaded; tabs: Combat, Visuals, Movement, Settings; mouse mode locked.')
