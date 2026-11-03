@@ -1,7 +1,7 @@
--- SATISHUB | MURDER DUELS | V4.5
+-- SATISHUB | MURDER DUELS | V4.9
 -- MD 3D emblem / Meliodas anime background / Black & Gold UI
 -- RightShift = show/hide | Auto Execute on Teleport = always ON
--- Features: Aimbot, ESP, Noclip, saved settings, page animations, minimize bar, anime-style transparent UI.
+-- Features: Aimbot, ESP, Noclip, saved settings, page animations, minimize bar, solid anime background and redesigned layout.
 -- Put a Meliodas image asset id below or place SatisHub_Meliodas_background.png in executor workspace.
 
 if not game:IsLoaded() then game.Loaded:Wait() end
@@ -19,10 +19,12 @@ local env = (type(getgenv) == 'function' and getgenv()) or _G
 if type(env.SatisHubAnimeCleanup) == 'function' then pcall(env.SatisHubAnimeCleanup) end
 
 local RAW_URL = 'https://raw.githubusercontent.com/satisxx/SatisHub-Murder-Duels/main/Murderduels-lua'
-local BACKGROUND_ASSET_ID = '0'
+local BACKGROUND_ASSET_ID = '0' -- fallback ID, can be configured in Settings
 local BACKGROUND_FILE = 'SatisHub_Meliodas_background.png'
 local MD_LOGO_ASSET_ID = '0' -- optional Roblox image asset ID for metallic MD logo
 local MD_LOGO_FILE = 'SatisHub_MD_3D.png' -- optional local image in executor workspace
+local MINIMIZE_ICON_ASSET_ID = '0' -- optional uploaded Roblox image ID for SH restore icon
+local MINIMIZE_ICON_FILE = 'SatisHub_SH_Icon.png' -- local file from the ZIP
 local SETTINGS_FILE = 'SatisHub_Anime_Config.json'
 
 local GOLD = Color3.fromRGB(255, 198, 56)
@@ -46,10 +48,12 @@ local defaults = {
     team = true,
     circle = true,
     esp = false,
+    tpEnemy = false,
     noclip = false,
     autoTeleport = true,
     aimMethod = 'Mouse', -- fixed internally; no UI control
     longRange = true,
+    backgroundAssetId = '0',
 }
 
 local cfg = {}
@@ -75,6 +79,9 @@ cfg.smooth = math.clamp(cfg.smooth, 0.03, 1)
 if cfg.aimPart ~= 'Head' and cfg.aimPart ~= 'HumanoidRootPart' then cfg.aimPart = 'Head' end
 -- A saved configuration or teleport payload cannot change this mode.
 cfg.aimMethod = 'Mouse'
+if cfg.backgroundAssetId == '0' and BACKGROUND_ASSET_ID ~= '0' then
+    cfg.backgroundAssetId = BACKGROUND_ASSET_ID
+end
 
 -- Local persistence when readfile/writefile are available. The same path is kept
 -- as V4.4, so an existing configuration is not lost when updating.
@@ -95,7 +102,7 @@ local function saveSettings()
     return savedToFile
 end
 
-local connections, highlights, original = {}, {}, {}
+local connections, highlights, tpTags, original = {}, {}, {}, {}
 local alive = true
 local dragging = false
 local currentPage = nil
@@ -211,378 +218,522 @@ local function makeButton(parent, value, x, y, w, h, fn)
 end
 
 local gui = Instance.new('ScreenGui')
-gui.Name = 'SatisHub_MD_V4_5'
+gui.Name = 'SatisHub_MD_V4_9'
 gui.IgnoreGuiInset = true
 gui.ResetOnSpawn = false
 gui.DisplayOrder = 950
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 gui.Parent = PG
 
-main = frame(gui, 0, 0, 930, 540, BG, 2, 0.18)
+-- O fundo do menu e OPACO; a foto ocupa toda a area interior.
+main = frame(gui, 0, 0, 1060, 650, BG, 3, 0)
 main.AnchorPoint = Vector2.new(0.5, 0.5)
 main.Position = UDim2.fromScale(0.5, 0.5)
 main.ClipsDescendants = true
 rounded(main, 20)
-stroke(main, GOLD, 2, 0.08)
-glow(main, -6, -6, 942, 552, GOLD, 0.94, 1)
+local mainBorder = stroke(main, GOLD, 2.2, 0.02)
 
-local backdrop = Instance.new('ImageLabel')
-backdrop.Name = 'AnimeBackground'
-backdrop.BorderSizePixel = 0
-backdrop.BackgroundTransparency = 1
-backdrop.Position = UDim2.fromOffset(0, 0)
-backdrop.Size = UDim2.fromOffset(930, 540)
-backdrop.ScaleType = Enum.ScaleType.Crop
-backdrop.ImageTransparency = 0.06
-backdrop.ZIndex = 2
-backdrop.Parent = main
-
-local hasPicture = false
-if BACKGROUND_ASSET_ID ~= '' and BACKGROUND_ASSET_ID ~= '0' then
-    backdrop.Image = 'rbxassetid://' .. BACKGROUND_ASSET_ID
-    hasPicture = true
-else
-    local getAsset = nil
-    if type(getcustomasset) == 'function' then getAsset = getcustomasset end
-    if not getAsset and type(getsynasset) == 'function' then getAsset = getsynasset end
-    if getAsset then
-        local ok, asset = pcall(getAsset, BACKGROUND_FILE)
-        if ok and type(asset) == 'string' then
-            backdrop.Image = asset
-            hasPicture = true
-        end
-    end
-end
-local fallback = label(main, 'MD', 650, 118, 210, 240, 118, Color3.fromRGB(103, 73, 23), Enum.Font.GothamBlack, 2)
-fallback.TextXAlignment = Enum.TextXAlignment.Center
-fallback.TextTransparency = 0.16
-fallback.Visible = not hasPicture
-if not hasPicture then
-    warn('[SatisHub] Fundo do Meliodas indisponivel: coloca '..BACKGROUND_FILE..' no workspace do executor ou define BACKGROUND_ASSET_ID.')
-end
-local shade = frame(main, 185, 0, 745, 540, BG, 3, 0.72)
-
-local sidebar = frame(main, 0, 0, 190, 540, BG, 5, 0.32)
-frame(main, 189, 0, 1, 540, GOLD, 7, 0.45)
-label(sidebar, 'SatisHub', 20, 20, 160, 48, 27, PALE, Enum.Font.GothamBlack)
-label(sidebar, 'MURDER DUELS  |  1V1', 22, 70, 164, 18, 10, WHITE, Enum.Font.GothamBold)
--- 3D MD emblem: multiple offset layers give visible depth, with a gold highlight and a glowing orbit.
-local emblemOrbit = frame(sidebar, 15, 104, 160, 59, BG, 6, 1)
-rounded(emblemOrbit, 100)
-stroke(emblemOrbit, GOLD, 1.5, 0.20)
-local orbitGlow = frame(sidebar, 12, 101, 166, 65, BG, 6, 1)
-local mdFallbackParts = {emblemOrbit, orbitGlow}
-rounded(orbitGlow, 100)
-stroke(orbitGlow, GOLD, 4, 0.78)
-for depth = 6, 1, -1 do
-    local shadow = label(sidebar, 'MD', 42 + depth, 96 + depth, 120, 72, 57,
-        Color3.fromRGB(36 + depth * 8, 20 + depth * 4, 5), Enum.Font.GothamBlack, 7)
-    shadow.TextXAlignment = Enum.TextXAlignment.Center
-    table.insert(mdFallbackParts, shadow)
-end
-local emblem = label(sidebar, 'MD', 42, 96, 120, 72, 57, GOLD, Enum.Font.GothamBlack, 8)
-emblem.TextXAlignment = Enum.TextXAlignment.Center
-table.insert(mdFallbackParts, emblem)
-stroke(emblem, Color3.fromRGB(55, 28, 3), 1.8, 0.08)
-local goldGradient = Instance.new('UIGradient')
-goldGradient.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0.00, Color3.fromRGB(255, 249, 217)),
-    ColorSequenceKeypoint.new(0.40, Color3.fromRGB(255, 205, 59)),
-    ColorSequenceKeypoint.new(0.72, Color3.fromRGB(179, 99, 10)),
-    ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255, 220, 120))
+local animePhoto = Instance.new('ImageLabel')
+animePhoto.Name = 'MeliodasArtwork'
+animePhoto.BackgroundTransparency = 1
+animePhoto.BorderSizePixel = 0
+animePhoto.Position = UDim2.fromOffset(0, 0)
+animePhoto.Size = UDim2.fromScale(1, 1)
+animePhoto.ScaleType = Enum.ScaleType.Crop
+animePhoto.ImageTransparency = 0.04
+animePhoto.ZIndex = 3
+animePhoto.Parent = main
+local animeTint = frame(main, 0, 0, 1060, 650, BG, 4, 0.15)
+local tintGradient = Instance.new('UIGradient')
+tintGradient.Transparency = NumberSequence.new({
+    NumberSequenceKeypoint.new(0, 0.04),
+    NumberSequenceKeypoint.new(0.44, 0.23),
+    NumberSequenceKeypoint.new(0.72, 0.44),
+    NumberSequenceKeypoint.new(1, 0.64),
 })
-goldGradient.Rotation = 85
-goldGradient.Parent = emblem
-local starLeft = label(sidebar, '✦', 17, 118, 24, 26, 17, GOLD, Enum.Font.GothamBold, 8)
-local starRight = label(sidebar, '✦', 158, 131, 22, 23, 13, GOLD, Enum.Font.GothamBold, 8)
-table.insert(mdFallbackParts, starLeft)
-table.insert(mdFallbackParts, starRight)
-local glint = Instance.new('UIGradient')
-glint.Color = ColorSequence.new(Color3.fromRGB(255, 205, 70), Color3.fromRGB(116, 66, 14))
-glint.Parent = orbitGlow
+tintGradient.Rotation = 0
+tintGradient.Parent = animeTint
 
--- Prefer the real metallic 3D MD artwork when available, with the layered label as fallback.
-local mdLogo = Instance.new('ImageLabel')
-mdLogo.Name = 'MD_3D_Logo'
-mdLogo.BackgroundTransparency = 1
-mdLogo.BorderSizePixel = 0
-mdLogo.Position = UDim2.fromOffset(15, 95)
-mdLogo.Size = UDim2.fromOffset(165, 79)
-mdLogo.ScaleType = Enum.ScaleType.Fit
-mdLogo.ZIndex = 10
-mdLogo.Visible = false
-mdLogo.Parent = sidebar
-local logoAsset = nil
-if MD_LOGO_ASSET_ID ~= '' and MD_LOGO_ASSET_ID ~= '0' then
-    logoAsset = 'rbxassetid://' .. MD_LOGO_ASSET_ID
+-- Correcao de fundo: nao o esconder silenciosamente quando nao ha imagem.
+local photoWarning = label(main, 'MELIODAS: CONFIGURA A IMAGEM NAS SETTINGS', 633, 100, 405, 30, 12, GOLD, Enum.Font.GothamBold, 7)
+photoWarning.TextXAlignment = Enum.TextXAlignment.Right
+local pictureStatus = 'Imagem nao configurada'
+local function applyImage()
+    local assetId = tostring(cfg.backgroundAssetId or '0')
+    assetId = assetId:match('^%s*(%d+)%s*$') or '0'
+    if assetId ~= '0' then
+        animePhoto.Image = 'rbxassetid://' .. assetId
+        photoWarning.Visible = false
+        pictureStatus = 'Asset ID selecionado: ' .. assetId
+        return true
+    end
+    local custom = (type(getcustomasset) == 'function' and getcustomasset)
+        or (type(getsynasset) == 'function' and getsynasset)
+    if custom then
+        local paths = {BACKGROUND_FILE, 'workspace/' .. BACKGROUND_FILE}
+        for _, path in ipairs(paths) do
+            local ok, asset = pcall(custom, path)
+            if ok and type(asset) == 'string' and #asset > 0 then
+                animePhoto.Image = asset
+                pictureStatus = 'Imagem local: ' .. path
+                photoWarning.Visible = false
+                return true
+            end
+        end
+    end
+    animePhoto.Image = ''
+    photoWarning.Visible = true
+    pictureStatus = 'Imagem por configurar: usa o ID nas Settings'
+    return false
+end
+applyImage()
+
+-- Header dourado com divisoria. Barra lateral com icones vetoriais novos.
+local sidebar = frame(main, 0, 0, 218, 650, BG, 8, 0.015)
+stroke(sidebar, Color3.fromRGB(90, 65, 18), 1, 0.6)
+local sideDivider = frame(main, 217, 0, 2, 650, GOLD, 9, 0.40)
+label(sidebar, 'SatisHub', 23, 23, 175, 43, 28, PALE, Enum.Font.GothamBlack, 11)
+label(sidebar, 'MURDER DUELS  •  1V1', 25, 69, 171, 25, 11, MUTED, Enum.Font.GothamBold, 11)
+
+local mdOrbit = frame(sidebar, 24, 110, 170, 96, BG, 9, 1)
+rounded(mdOrbit, 30)
+local orbitStroke = stroke(mdOrbit, GOLD, 2, 0.18)
+local mdLayers = {}
+for d = 7, 1, -1 do
+    local layer = label(mdOrbit, 'MD', 12 + d, 5 + d, 148, 85, 68,
+        Color3.fromRGB(49 + d * 7, 28 + d * 4, 6), Enum.Font.GothamBlack, 10)
+    layer.TextXAlignment = Enum.TextXAlignment.Center
+    mdLayers[#mdLayers + 1] = layer
+end
+local mdFront = label(mdOrbit, 'MD', 12, 5, 148, 85, 68, GOLD, Enum.Font.GothamBlack, 11)
+mdFront.TextXAlignment = Enum.TextXAlignment.Center
+mdLayers[#mdLayers + 1] = mdFront
+local mdGradient = Instance.new('UIGradient')
+mdGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 251, 224)),
+    ColorSequenceKeypoint.new(0.36, Color3.fromRGB(255, 209, 79)),
+    ColorSequenceKeypoint.new(0.74, Color3.fromRGB(183, 101, 15)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(252, 228, 151)),
+})
+mdGradient.Rotation = 83
+mdGradient.Parent = mdFront
+
+local mdArtwork = Instance.new('ImageLabel')
+mdArtwork.Name = 'MDLogo'
+mdArtwork.BackgroundTransparency = 1
+mdArtwork.Position = UDim2.fromOffset(19, 103)
+mdArtwork.Size = UDim2.fromOffset(178, 111)
+mdArtwork.ScaleType = Enum.ScaleType.Fit
+mdArtwork.ZIndex = 12
+mdArtwork.Visible = false
+mdArtwork.Parent = sidebar
+local logoSource = nil
+if MD_LOGO_ASSET_ID ~= '0' then
+    logoSource = 'rbxassetid://' .. MD_LOGO_ASSET_ID
 else
-    local converter = type(getcustomasset) == 'function' and getcustomasset or nil
-    if not converter and type(getsynasset) == 'function' then converter = getsynasset end
-    if converter then
-        local ok, result = pcall(converter, MD_LOGO_FILE)
-        if ok and type(result) == 'string' then logoAsset = result end
+    local custom = (type(getcustomasset) == 'function' and getcustomasset)
+        or (type(getsynasset) == 'function' and getsynasset)
+    if custom then
+        for _, p in ipairs({MD_LOGO_FILE, 'workspace/' .. MD_LOGO_FILE}) do
+            local ok, asset = pcall(custom, p)
+            if ok and type(asset) == 'string' and #asset > 0 then
+                logoSource = asset
+                break
+            end
+        end
     end
 end
-if logoAsset then
-    mdLogo.Image = logoAsset
-    mdLogo.Visible = true
-    for _, part in ipairs(mdFallbackParts) do part.Visible = false end
+if logoSource then
+    mdArtwork.Image = logoSource
+    mdArtwork.Visible = true
+    mdOrbit.Visible = false
 end
-label(sidebar, 'BLACK  /  GOLD', 21, 503, 158, 17, 10, MUTED, Enum.Font.GothamBold)
 
-local pageTitle = label(main, 'COMBAT', 212, 18, 350, 39, 24, WHITE, Enum.Font.GothamBlack)
-local pageSubtitle = label(main, 'ANIME THEME   •   TRANSPARENT UI', 213, 60, 430, 17, 11, GOLD, Enum.Font.GothamBold)
+local pageTitle = label(main, 'COMBAT', 240, 24, 400, 45, 30, WHITE, Enum.Font.GothamBlack, 12)
+local pageSubtitle = label(main, 'MELIODAS  /  BLACK & GOLD', 242, 72, 500, 28, 13, GOLD, Enum.Font.GothamBold, 12)
+local headerLine = frame(main, 239, 108, 798, 2, GOLD, 10, 0.28)
 
-miniBar = frame(gui, 18, 18, 255, 48, BG, 20, 0.10)
+-- Compact, draggable SH image button replaces the old MD | SATISHUB / ABRIR bar.
+-- Roblox ImageButtons cannot read PNG files from a GitHub URL directly.
+-- Use getcustomasset from the workspace or provide an uploaded image asset ID.
+local iconImageSource = nil
+if MINIMIZE_ICON_ASSET_ID ~= '0' and MINIMIZE_ICON_ASSET_ID ~= '' then
+    iconImageSource = 'rbxassetid://' .. tostring(MINIMIZE_ICON_ASSET_ID)
+else
+    local getAsset = (type(getcustomasset) == 'function' and getcustomasset)
+        or (type(getsynasset) == 'function' and getsynasset)
+    if getAsset then
+        for _, path in ipairs({MINIMIZE_ICON_FILE, 'workspace/' .. MINIMIZE_ICON_FILE}) do
+            local ok, asset = pcall(getAsset, path)
+            if ok and type(asset) == 'string' and #asset > 0 then
+                iconImageSource = asset
+                break
+            end
+        end
+    end
+end
+
+miniBar = Instance.new('ImageButton')
+miniBar.Name = 'SatisHubRestoreIcon'
+miniBar.Size = UDim2.fromOffset(78, 78)
+miniBar.Position = UDim2.fromOffset(18, 135)
+miniBar.BackgroundColor3 = BG
+miniBar.BackgroundTransparency = iconImageSource and 1 or 0.1
+miniBar.BorderSizePixel = 0
+miniBar.Image = iconImageSource or ''
+miniBar.ScaleType = Enum.ScaleType.Fit
+miniBar.ZIndex = 50
+miniBar.AutoButtonColor = false
 miniBar.Visible = false
-rounded(miniBar, 13)
-stroke(miniBar, GOLD, 2, 0.08)
-label(miniBar, 'SatisHub  •  MD', 14, 0, 160, 48, 14, GOLD, Enum.Font.GothamBold, 21)
-makeButton(miniBar, 'Open', 180, 9, 60, 30, function()
+miniBar.Parent = gui
+rounded(miniBar, 39)
+local miniStroke = stroke(miniBar, GOLD, 1.8, 0.12)
+-- Fallback is only used if the executor cannot load the image.
+if not iconImageSource then
+    local fallbackText = label(miniBar, 'SH', 0, 0, 78, 78, 29, GOLD, Enum.Font.GothamBlack, 51)
+    fallbackText.TextXAlignment = Enum.TextXAlignment.Center
+    warn('[SatisHub] SH icon unavailable; put SatisHub_SH_Icon.png in the executor workspace or set MINIMIZE_ICON_ASSET_ID.')
+end
+local iconSize = UDim2.fromOffset(78, 78)
+local hoveredSize = UDim2.fromOffset(86, 86)
+bind(miniBar.MouseEnter, function()
+    tween(miniBar, TweenInfo.new(0.14, Enum.EasingStyle.Quad), {Size = hoveredSize})
+    tween(miniStroke, TweenInfo.new(0.14), {Thickness = 2.5, Transparency = 0})
+end)
+bind(miniBar.MouseLeave, function()
+    tween(miniBar, TweenInfo.new(0.14, Enum.EasingStyle.Quad), {Size = iconSize})
+    tween(miniStroke, TweenInfo.new(0.14), {Thickness = 1.8, Transparency = 0.12})
+end)
+local function restoreWindow()
     miniBar.Visible = false
+    miniBar.Size = iconSize
     main.Visible = true
-    main.Position = UDim2.fromScale(0.5, 0.52)
-    tween(main, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = UDim2.fromScale(0.5, 0.5)})
-end)
-
-local minimizeButton = makeButton(main, '–', 850, 16, 28, 28, function()
-    tween(main, TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Position = UDim2.fromScale(0.5, 0.54)})
-    task.delay(0.16, function()
-        main.Visible = false
-        miniBar.Visible = true
+    main.Position = UDim2.fromScale(0.5, 0.54)
+    tween(main, TweenInfo.new(0.24, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+        {Position = UDim2.fromScale(0.5, 0.5)})
+end
+bind(miniBar.MouseButton1Click, restoreWindow)
+local minButton = makeButton(main, '−', 975, 27, 31, 31, function()
+    tween(main, TweenInfo.new(0.18, Enum.EasingStyle.Quart, Enum.EasingDirection.In),
+        {Position = UDim2.fromScale(0.5, 0.55)})
+    task.delay(0.19, function()
+        if alive then main.Visible = false; miniBar.Visible = true end
     end)
 end)
-minimizeButton.TextSize = 22
-
-local closeButton = makeButton(main, '×', 884, 16, 28, 28, function()
-    tween(main, TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Position = UDim2.fromScale(0.5, 0.54)})
-    task.delay(0.16, function()
-        main.Visible = false
-        miniBar.Visible = false
-    end)
+minButton.TextSize = 24
+local closeButton = makeButton(main, '×', 1011, 27, 31, 31, function()
+    main.Visible = false
+    miniBar.Visible = false
 end)
-closeButton.TextSize = 21
+closeButton.TextSize = 23
 
-local statusStrip = frame(main, 202, 499, 706, 28, Color3.fromRGB(6, 7, 10), 9, 0.18)
+local statusStrip = frame(main, 237, 597, 802, 35, BG, 12, 0.07)
 rounded(statusStrip, 9)
-stroke(statusStrip, Color3.fromRGB(99, 76, 35), 1, 0.25)
-statusText = label(statusStrip, '●  SATISHUB LOADED', 13, 1, 350, 26, 11, GREEN, Enum.Font.GothamBold, 10)
-local tinyText = label(statusStrip, 'Murder Duels   •   V4.5', 520, 1, 170, 26, 11, MUTED, Enum.Font.GothamBold, 10)
-tinyText.TextXAlignment = Enum.TextXAlignment.Right
+stroke(statusStrip, GOLD_DARK, 1, 0.20)
+statusText = label(statusStrip, '●  SATISHUB READY', 16, 2, 540, 31, 12, GREEN, Enum.Font.GothamBold, 13)
+local versionText = label(statusStrip, 'Murder Duels   •   V4.9', 573, 2, 208, 31, 12, MUTED, Enum.Font.GothamBold, 13)
+versionText.TextXAlignment = Enum.TextXAlignment.Right
 
-local navNames = {'Combat', 'Visuals', 'Movement', 'Settings'}
-local navIcons = {'✦', '◈', '➜', '⚙'}
+local pageNames = {'Combat', 'Visuals', 'Movement', 'Settings'}
 local navButtons, pages = {}, {}
-local pagePositions = {
-    base = UDim2.fromOffset(202, 96),
-    enter = UDim2.fromOffset(235, 96),
-    exit = UDim2.fromOffset(170, 96),
+local headerLabels = {
+    Combat = 'AIMBOT  •  PRECISION SETTINGS',
+    Visuals = 'PLAYER VISUALS  •  GOLD OUTLINES',
+    Movement = 'MOVEMENT  •  COLLISION SETTINGS',
+    Settings = 'PERSONALIZACAO  •  ASSETS E CONTROLOS',
 }
-local pageSubtitles = {
-    Combat = 'ANIME THEME   •   AIMBOT',
-    Visuals = 'TRANSPARENT UI   •   VISUALS',
-    Movement = 'MOVEMENT   •   NOCLIP',
-    Settings = 'SATISHUB   •   UI SETTINGS',
-}
+local showPage
 
-for i, name in ipairs(navNames) do
-    local buttonObj = makeButton(sidebar, navIcons[i] .. '   ' .. name, 15, 181 + (i - 1) * 55, 160, 45, function()
-        if name == currentPage then return end
-        local incoming = pages[name]
-        local outgoing = currentPage and pages[currentPage] or nil
-        currentPage = name
-        pageTitle.Text = string.upper(name)
-        pageSubtitle.Text = pageSubtitles[name] or 'SATISHUB'
-        pulse(pageTitle)
-        pulse(pageSubtitle)
-        for tabName, btn in pairs(navButtons) do
-            local active = (tabName == name)
-            btn.BackgroundColor3 = active and Color3.fromRGB(111, 72, 15) or PANEL2
-            btn.TextColor3 = active and GOLD or WHITE
-            btn:SetAttribute('RestColor', btn.BackgroundColor3)
+-- Icones sao desenhados com frames, nao dependem de fontes especiais.
+local function iconLine(root, x, y, w, h, rotation)
+    local f = frame(root, x, y, w, h, GOLD, 13, 0)
+    f.Rotation = rotation or 0
+    rounded(f, 2)
+    return f
+end
+local function navIcon(root, kind)
+    if kind == 'Combat' then
+        local ring = frame(root, 9, 8, 20, 20, BG, 12, 1)
+        rounded(ring, 20)
+        stroke(ring, GOLD, 2)
+        iconLine(root, 18, 1, 2, 11)
+        iconLine(root, 18, 24, 2, 11)
+        iconLine(root, 1, 17, 12, 2)
+        iconLine(root, 25, 17, 12, 2)
+    elseif kind == 'Visuals' then
+        local outer = frame(root, 4, 11, 30, 15, BG, 12, 1)
+        rounded(outer, 13)
+        stroke(outer, GOLD, 2)
+        local pupil = frame(root, 16, 12, 7, 13, GOLD, 13)
+        rounded(pupil, 7)
+    elseif kind == 'Movement' then
+        iconLine(root, 14, 1, 5, 19, -28)
+        iconLine(root, 19, 15, 5, 20, 34)
+        iconLine(root, 8, 14, 24, 3, -25)
+    elseif kind == 'Settings' then
+        iconLine(root, 3, 9, 32, 2)
+        iconLine(root, 3, 18, 32, 2)
+        iconLine(root, 3, 27, 32, 2)
+        for _, point in ipairs({{11,6},{25,15},{16,24}}) do
+            local knob = frame(root, point[1], point[2], 7, 8, GOLD, 14)
+            rounded(knob, 8)
         end
-        if outgoing and outgoing ~= incoming then
-            outgoing.Visible = true
-            tween(outgoing, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-                Position = pagePositions.exit,
-                BackgroundTransparency = 1,
-            })
-            task.delay(0.18, function()
-                if outgoing and outgoing ~= pages[currentPage] then
-                    outgoing.Visible = false
-                    outgoing.Position = pagePositions.base
-                    outgoing.BackgroundTransparency = 1
-                end
-            end)
-        end
-        incoming.Visible = true
-        incoming.Position = pagePositions.enter
-        incoming.BackgroundTransparency = 1
-        tween(incoming, TweenInfo.new(0.22, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
-            Position = pagePositions.base,
-            BackgroundTransparency = 0.95,
-        })
+    end
+end
+
+for i, name in ipairs(pageNames) do
+    local y = 235 + (i - 1) * 69
+    local nav = makeButton(sidebar, '', 20, y, 180, 58, function()
+        if showPage then showPage(name, false) end
     end)
-    buttonObj.TextXAlignment = Enum.TextXAlignment.Left
-    buttonObj.TextSize = 14
-    navButtons[name] = buttonObj
+    nav.Text = ''
+    nav.BackgroundTransparency = 0.04
+    local iconTile = frame(nav, 11, 10, 40, 38, BG, 11, 0.18)
+    rounded(iconTile, 10)
+    stroke(iconTile, Color3.fromRGB(119, 89, 32), 1, 0.2)
+    navIcon(iconTile, name)
+    label(nav, name, 63, 0, 111, 58, 16, WHITE, Enum.Font.GothamBold, 12)
+    navButtons[name] = nav
+end
+label(sidebar, 'SHIFT DIREITO  •  MENU', 18, 579, 187, 21, 10, MUTED, Enum.Font.GothamBold, 11)
+label(sidebar, 'MD / BLACK & GOLD', 20, 608, 186, 18, 11, GOLD, Enum.Font.GothamBold, 11)
+
+-- CanvasGroup anima tambem os textos e botoes, nao apenas o fundo.
+for _, name in ipairs(pageNames) do
+    local canvas = Instance.new('CanvasGroup')
+    canvas.Name = name .. 'Page'
+    canvas.Position = UDim2.fromOffset(238, 128)
+    canvas.Size = UDim2.fromOffset(803, 449)
+    canvas.BackgroundTransparency = 1
+    canvas.BorderSizePixel = 0
+    canvas.GroupTransparency = 1
+    canvas.Visible = false
+    canvas.ZIndex = 6
+    canvas.Parent = main
+    pages[name] = canvas
+end
+local animationId = 0
+showPage = function(name, instant)
+    if not pages[name] then return end
+    if currentPage == name and not instant then return end
+    animationId = animationId + 1
+    local ownAnimation = animationId
+    local old = currentPage and pages[currentPage] or nil
+    local new = pages[name]
+    currentPage = name
+    pageTitle.Text = string.upper(name)
+    pageSubtitle.Text = headerLabels[name]
+    for key, b in pairs(navButtons) do
+        local active = (key == name)
+        local rest = active and Color3.fromRGB(95, 62, 13) or PANEL2
+        b:SetAttribute('RestColor', rest)
+        tween(b, TweenInfo.new(0.18, Enum.EasingStyle.Quart), {BackgroundColor3 = rest})
+    end
+    if instant or old == nil then
+        for key, page in pairs(pages) do
+            page.Visible = (key == name)
+            page.GroupTransparency = (key == name) and 0 or 1
+            page.Position = UDim2.fromOffset(238, 128)
+        end
+        return
+    end
+    if old and old ~= new then
+        tween(old, TweenInfo.new(0.22, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {
+            GroupTransparency = 1,
+            Position = UDim2.fromOffset(212, 128),
+        })
+    end
+    new.Visible = true
+    new.GroupTransparency = 1
+    new.Position = UDim2.fromOffset(284, 128)
+    tween(new, TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+        GroupTransparency = 0,
+        Position = UDim2.fromOffset(238, 128),
+    })
+    tween(pageTitle, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {TextColor3 = GOLD})
+    task.delay(0.24, function()
+        if not alive or animationId ~= ownAnimation then return end
+        for key, page in pairs(pages) do
+            if key ~= name then
+                page.Visible = false
+                page.GroupTransparency = 1
+                page.Position = UDim2.fromOffset(238, 128)
+            end
+        end
+    end)
+    task.delay(0.25, function()
+        if alive then tween(pageTitle, TweenInfo.new(0.2), {TextColor3 = WHITE}) end
+    end)
 end
 
-for _, name in ipairs(navNames) do
-    local page = frame(main, 202, 96, 708, 388, BG, 5, 0.95)
-    page.Visible = false
-    page.ClipsDescendants = true
-    pages[name] = page
-end
-
-local function card(parent, x, y, w, h, titleText)
-    local cardGlow = glow(parent, x - 4, y - 4, w + 8, h + 8, GOLD, 0.92, 5)
-    cardGlow.BackgroundTransparency = 0.95
-    local c = frame(parent, x, y, w, h, Color3.fromRGB(12, 12, 14), 6, 0.32)
-    rounded(c, 14)
-    stroke(c, Color3.fromRGB(221, 165, 46), 1, 0.12)
-    label(c, titleText, 16, 13, w - 24, 30, 17, WHITE, Enum.Font.GothamBold, 8)
-    return c, cardGlow
+-- Cartoes maiores com texto em varias linhas e sem ultrapassar margens.
+local function card(parent, x, y, w, h, heading, subtitle)
+    local c = frame(parent, x, y, w, h, Color3.fromRGB(10, 11, 16), 7, 0.10)
+    rounded(c, 15)
+    stroke(c, Color3.fromRGB(222, 163, 43), 1.5, 0.14)
+    local head = label(c, heading, 18, 12, w - 38, 37, 19, PALE, Enum.Font.GothamBold, 9)
+    if subtitle then
+        local s = label(c, subtitle, 18, 51, w - 36, 40, 12, MUTED, Enum.Font.Gotham, 9)
+        s.TextWrapped = true
+        s.TextYAlignment = Enum.TextYAlignment.Top
+    end
+    return c
 end
 
 local function restoreCollision()
-    for part, previous in pairs(original) do
-        if part and part.Parent then part.CanCollide = previous end
+    for part, state in pairs(original) do
+        if part and part.Parent then part.CanCollide = state end
     end
     table.clear(original)
 end
 
-local function makeToggle(parent, caption, key, x, y, width)
-    width = width or 278
-    local row = frame(parent, x, y, width, 44, PANEL, 7, 0.27)
-    rounded(row, 10)
-    stroke(row, Color3.fromRGB(92, 72, 44), 1, 0.45)
-    label(row, caption, 12, 4, width - 88, 36, 12, WHITE, Enum.Font.GothamBold, 8)
-    local b = makeButton(row, 'OFF', width - 77, 7, 64, 30, function(btn)
+local function optionRow(parent, caption, key, x, y, w)
+    local r = frame(parent, x, y, w, 54, PANEL, 8, 0.035)
+    rounded(r, 11)
+    stroke(r, Color3.fromRGB(82, 66, 39), 1, 0.3)
+    local t = label(r, caption, 15, 4, w - 112, 46, 14, WHITE, Enum.Font.GothamBold, 10)
+    t.TextTruncate = Enum.TextTruncate.AtEnd
+    local b = makeButton(r, 'OFF', w - 90, 9, 75, 36, function(btn)
         cfg[key] = not cfg[key]
         saveSettings()
         if key == 'noclip' and not cfg[key] then restoreCollision() end
         btn.Text = cfg[key] and 'ON' or 'OFF'
         btn.TextColor3 = cfg[key] and GOLD or MUTED
-        btn.BackgroundColor3 = cfg[key] and Color3.fromRGB(83, 52, 9) or PANEL2
+        btn.BackgroundColor3 = cfg[key] and Color3.fromRGB(90, 56, 13) or PANEL2
         btn:SetAttribute('RestColor', btn.BackgroundColor3)
         if statusText then
-            statusText.Text = cfg[key] and ('●  ' .. string.upper(caption) .. ' ENABLED') or ('●  ' .. string.upper(caption) .. ' DISABLED')
-            statusText.TextColor3 = cfg[key] and GREEN or RED
+            statusText.Text = '●  ' .. caption .. ': ' .. btn.Text
         end
     end)
     b.Text = cfg[key] and 'ON' or 'OFF'
     b.TextColor3 = cfg[key] and GOLD or MUTED
-    b.BackgroundColor3 = cfg[key] and Color3.fromRGB(83, 52, 9) or PANEL2
+    b.BackgroundColor3 = cfg[key] and Color3.fromRGB(90, 56, 13) or PANEL2
     b:SetAttribute('RestColor', b.BackgroundColor3)
-    return row
+    return r
 end
 
-local function makeSlider(parent, caption, key, x, y, width, minimum, maximum, decimals)
-    local holder = frame(parent, x, y, width, 78, PANEL, 7, 0.28)
-    rounded(holder, 10)
-    stroke(holder, Color3.fromRGB(92, 72, 44), 1, 0.40)
-    label(holder, caption, 12, 8, width - 102, 23, 12, WHITE, Enum.Font.GothamBold, 9)
-    local value = label(holder, '', width - 110, 8, 99, 23, 13, GOLD, Enum.Font.GothamBold, 9)
+local function choiceRow(parent, caption, key, values, x, y, w)
+    local r = frame(parent, x, y, w, 54, PANEL, 8, 0.035)
+    rounded(r, 11)
+    stroke(r, Color3.fromRGB(82, 66, 39), 1, 0.3)
+    label(r, caption, 15, 4, 205, 46, 14, WHITE, Enum.Font.GothamBold, 10)
+    local b = makeButton(r, '', w - 158, 9, 143, 36, function(btn)
+        local i = table.find(values, cfg[key]) or 0
+        cfg[key] = values[(i % #values) + 1]
+        btn.Text = cfg[key] == 'HumanoidRootPart' and 'TORSO' or string.upper(cfg[key])
+        saveSettings()
+    end)
+    b.Text = cfg[key] == 'HumanoidRootPart' and 'TORSO' or string.upper(cfg[key])
+    b.TextColor3 = GOLD
+    return r
+end
+
+local function sliderRow(parent, caption, key, x, y, w, mn, mx, decimal)
+    local c = frame(parent, x, y, w, 105, PANEL, 8, 0.04)
+    rounded(c, 11)
+    stroke(c, Color3.fromRGB(82, 66, 39), 1, 0.3)
+    label(c, caption, 15, 10, w - 115, 34, 14, WHITE, Enum.Font.GothamBold, 10)
+    local value = label(c, '', w - 108, 10, 92, 34, 14, GOLD, Enum.Font.GothamBold, 10)
     value.TextXAlignment = Enum.TextXAlignment.Right
-    local track = frame(holder, 14, 47, width - 28, 6, Color3.fromRGB(63, 63, 66), 9, 0.20)
-    rounded(track, 3)
-    local fill = frame(track, 0, 0, 0, 6, GOLD, 10, 0)
-    rounded(fill, 3)
-    local knobGlow = glow(track, -2, -7, 20, 20, GOLD, 0.86, 10)
-    knobGlow.BackgroundTransparency = 0.86
-    local knob = frame(track, 0, -5, 16, 16, WHITE, 11, 0)
-    rounded(knob, 9)
-    local sliding = false
+    local track = frame(c, 18, 72, w - 36, 7, Color3.fromRGB(75, 73, 71), 10)
+    rounded(track, 5)
+    local filled = frame(track, 0, 0, 0, 7, GOLD, 11)
+    rounded(filled, 5)
+    local handle = frame(track, 0, -6, 19, 19, WHITE, 12)
+    rounded(handle, 10)
+    stroke(handle, GOLD, 2, 0.1)
+    local active = false
     local function refresh()
-        local alpha = math.clamp((cfg[key] - minimum) / (maximum - minimum), 0, 1)
-        fill.Size = UDim2.new(alpha, 0, 0, 6)
-        knob.Position = UDim2.new(alpha, -8, 0, -5)
-        knobGlow.Position = UDim2.new(alpha, -10, 0, -7)
-        if decimals == 0 then value.Text = string.format('%d', math.floor(cfg[key] + 0.5)) else value.Text = string.format('%.2f', cfg[key]) end
+        local alpha = math.clamp((cfg[key] - mn) / (mx - mn), 0, 1)
+        filled.Size = UDim2.new(alpha, 0, 1, 0)
+        handle.Position = UDim2.new(alpha, -10, 0, -6)
+        value.Text = decimal == 0 and string.format('%d', cfg[key]) or string.format('%.2f', cfg[key])
     end
-    local function setAt(mouseX)
+    local function setPos(mouseX)
         local alpha = math.clamp((mouseX - track.AbsolutePosition.X) / math.max(1, track.AbsoluteSize.X), 0, 1)
-        local amount = minimum + (maximum - minimum) * alpha
-        cfg[key] = (decimals == 0) and math.floor(amount + 0.5) or math.floor(amount * 100 + 0.5) / 100
+        local amount = mn + alpha * (mx - mn)
+        cfg[key] = decimal == 0 and math.floor(amount + 0.5) or math.floor(amount * 100 + 0.5) / 100
         refresh()
         saveSettings()
     end
-    bind(holder.InputBegan, function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then sliding = true; setAt(input.Position.X) end
-    end)
-    bind(UIS.InputChanged, function(input)
-        if sliding and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then setAt(input.Position.X) end
-    end)
-    bind(UIS.InputEnded, function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then sliding = false end
-    end)
-    refresh()
-    return holder
-end
-
-local function makeChoice(parent, caption, options, key, x, y, width)
-    local holder = frame(parent, x, y, width, 44, PANEL, 7, 0.28)
-    rounded(holder, 10)
-    stroke(holder, Color3.fromRGB(92, 72, 44), 1, 0.45)
-    label(holder, caption, 12, 4, 145, 35, 12, WHITE, Enum.Font.GothamBold, 8)
-    local btn = makeButton(holder, '', width - 131, 6, 118, 32, function(b)
-        local current = cfg[key]
-        local index = table.find(options, current) or 0
-        cfg[key] = options[(index % #options) + 1]
-        b.Text = cfg[key] == 'HumanoidRootPart' and 'Torso' or cfg[key]
-        saveSettings()
-        if statusText then
-            statusText.Text = '●  ' .. caption .. ': ' .. b.Text
-            statusText.TextColor3 = GOLD
+    bind(c.InputBegan, function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            active = true
+            setPos(input.Position.X)
         end
     end)
-    btn.Text = cfg[key] == 'HumanoidRootPart' and 'Torso' or cfg[key]
-    btn.TextColor3 = GOLD
-    btn:SetAttribute('RestColor', btn.BackgroundColor3)
-    return holder
+    bind(UIS.InputChanged, function(input)
+        if active and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            setPos(input.Position.X)
+        end
+    end)
+    bind(UIS.InputEnded, function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then active = false end
+    end)
+    refresh()
+    return c
 end
 
--- COMBAT
+-- 2 cards com espacamento e texto protegido.
 local combat = pages.Combat
-local combatLeft = card(combat, 0, 0, 345, 338, '✦  Aimbot')
-label(combatLeft, 'Automatically track a visible opponent.', 16, 46, 312, 23, 11, MUTED)
-makeToggle(combatLeft, 'Automatic Aim', 'aim', 15, 78, 315)
-makeChoice(combatLeft, 'Aim Part', {'Head', 'HumanoidRootPart'}, 'aimPart', 15, 131, 315)
-makeToggle(combatLeft, 'Wall Check', 'wall', 15, 184, 315)
-makeToggle(combatLeft, 'Long Range Aim', 'longRange', 15, 237, 315)
-local combatRight = card(combat, 360, 0, 348, 338, '◈  FOV Settings')
-makeSlider(combatRight, 'FOV radius (px)', 'fov', 14, 52, 320, 30, 850, 0)
-makeSlider(combatRight, 'Aim smoothness', 'smooth', 14, 143, 320, 0.03, 1, 2)
-makeToggle(combatRight, 'Show FOV circle', 'circle', 14, 245, 320)
-targetText = label(combat, 'TARGET: none', 8, 350, 680, 28, 12, GOLD, Enum.Font.GothamBold, 8)
+local combatLeft = card(combat, 0, 0, 390, 401, 'AIMBOT', 'Opcoes de alvo e verificacao de visibilidade.')
+optionRow(combatLeft, 'Automatic Aim', 'aim', 15, 103, 360)
+choiceRow(combatLeft, 'Aim Part', 'aimPart', {'Head', 'HumanoidRootPart'}, 15, 166, 360)
+optionRow(combatLeft, 'Wall Check', 'wall', 15, 229, 360)
+optionRow(combatLeft, 'Long Range Aim', 'longRange', 15, 292, 360)
+local combatRight = card(combat, 412, 0, 390, 401, 'FOV & PRECISION', 'Personaliza a area de procura e suavidade da mira.')
+sliderRow(combatRight, 'FOV Radius (px)', 'fov', 15, 100, 360, 30, 850, 0)
+sliderRow(combatRight, 'Aim Smoothness', 'smooth', 15, 215, 360, 0.03, 1, 2)
+optionRow(combatRight, 'Show FOV Circle', 'circle', 15, 329, 360)
+targetText = label(combat, 'TARGET: none', 12, 410, 776, 30, 13, GOLD, Enum.Font.GothamBold, 10)
 
--- VISUALS
 local visuals = pages.Visuals
-local visCard = card(visuals, 0, 0, 708, 275, '◈  Player Visuals')
-label(visCard, 'Gold player outlines and anime-style clean overlay.', 18, 48, 654, 24, 12, MUTED)
-makeToggle(visCard, 'Player ESP', 'esp', 18, 85, 672)
-makeToggle(visCard, 'Show FOV Circle', 'circle', 18, 145, 672)
-makeToggle(visCard, 'Team Check', 'team', 18, 205, 672)
-local visNote = label(visuals, 'Highlights may be hidden or unsupported by some game rigs.', 10, 292, 670, 38, 12, MUTED)
-visNote.TextWrapped = true
+local visCard = card(visuals, 0, 0, 802, 401, 'VISUAL SETTINGS', 'Define a apresentacao de jogadores e elementos do HUD.')
+optionRow(visCard, 'Player ESP', 'esp', 18, 108, 764)
+optionRow(visCard, 'FOV Circle', 'circle', 18, 174, 764)
+optionRow(visCard, 'Team Check', 'team', 18, 240, 764)
+optionRow(visCard, 'TP to Enemy  [U]', 'tpEnemy', 18, 306, 764)
 
--- MOVEMENT
 local movement = pages.Movement
-local moveCard = card(movement, 0, 0, 708, 255, '➜  Movement')
-label(moveCard, 'Noclip changes your local character collisions.', 18, 48, 650, 28, 12, MUTED)
-makeToggle(moveCard, 'Noclip', 'noclip', 18, 94, 672)
-local moveNote = label(moveCard, 'The server may restore your position or collision.', 18, 156, 650, 48, 12, MUTED)
+local moveCard = card(movement, 0, 0, 802, 401, 'MOVEMENT', 'Configuracoes de colisao locais do personagem.')
+optionRow(moveCard, 'Noclip', 'noclip', 18, 111, 764)
+local moveNote = label(moveCard, 'O servidor pode corrigir o movimento ou restaurar colisoes.', 19, 206, 760, 63, 14, MUTED)
 moveNote.TextWrapped = true
 
--- SETTINGS
 local settings = pages.Settings
-local settingsCard = card(settings, 0, 0, 708, 330, '⚙  SatisHub Settings')
-label(settingsCard, 'Right Shift = show / hide the menu', 18, 80, 640, 27, 13, GOLD)
-label(settingsCard, 'The minimize button keeps a small restore bar on screen.', 18, 132, 650, 27, 12, WHITE)
-label(settingsCard, 'Options are saved automatically when you change them.', 18, 183, 650, 27, 12, WHITE)
-local savedNote = label(settingsCard, 'Settings return after server changes when supported by the executor.', 18, 227, 650, 47, 12, MUTED)
-savedNote.TextWrapped = true
+local settingsCard = card(settings, 0, 0, 802, 401, 'SETTINGS & MELIODAS ART', 'Imagem de fundo, atalhos e persistencia de opcoes.')
+label(settingsCard, 'ID de imagem Roblox (Meliodas)', 20, 104, 500, 30, 15, PALE, Enum.Font.GothamBold, 10)
+local imageInput = Instance.new('TextBox')
+imageInput.Name = 'BackgroundAssetId'
+imageInput.Size = UDim2.fromOffset(525, 46)
+imageInput.Position = UDim2.fromOffset(20, 145)
+imageInput.BackgroundColor3 = PANEL2
+imageInput.BorderSizePixel = 0
+imageInput.TextColor3 = WHITE
+imageInput.PlaceholderColor3 = MUTED
+imageInput.Text = cfg.backgroundAssetId ~= '0' and cfg.backgroundAssetId or ''
+imageInput.PlaceholderText = 'Cola aqui o ID numerico da imagem'
+imageInput.TextSize = 14
+imageInput.Font = Enum.Font.Gotham
+imageInput.ClearTextOnFocus = false
+imageInput.ZIndex = 10
+imageInput.Parent = settingsCard
+rounded(imageInput, 9)
+stroke(imageInput, GOLD_DARK, 1)
+local imageStatus = label(settingsCard, pictureStatus, 20, 218, 744, 44, 12, MUTED, Enum.Font.Gotham, 10)
+imageStatus.TextWrapped = true
+local applyBtn = makeButton(settingsCard, 'APLICAR IMAGEM', 557, 145, 223, 46, function()
+    local digits = imageInput.Text:match('^%s*(%d+)%s*$')
+    cfg.backgroundAssetId = digits or '0'
+    saveSettings()
+    applyImage()
+    imageStatus.Text = pictureStatus
+    imageStatus.TextColor3 = digits and GREEN or RED
+end)
+applyBtn.TextSize = 14
+label(settingsCard, 'Right Shift: abrir / esconder  |  Auto Execute: sempre ativo', 20, 280, 760, 35, 13, GOLD, Enum.Font.GothamBold, 10)
+local guide = label(settingsCard, 'Se a imagem nao surgir, publica o PNG como imagem no Roblox e cola o ID aqui.', 20, 329, 750, 50, 13, MUTED, Enum.Font.Gotham)
+guide.TextWrapped = true
 
 -- FOV overlay
 local fov = frame(gui, 0, 0, 1, 1, GOLD, 3, 1)
@@ -597,18 +748,34 @@ local function clearESP()
         pcall(function() obj:Destroy() end)
         highlights[p] = nil
     end
+    for p, obj in pairs(tpTags) do
+        pcall(function() obj:Destroy() end)
+        tpTags[p] = nil
+    end
+end
+
+local function validEnemy(p)
+    if p == LP or not p.Parent then return false end
+    if cfg.team and LP.Team and p.Team and LP.Team == p.Team then return false end
+    local char = p.Character
+    local hum = char and char:FindFirstChildOfClass('Humanoid')
+    local root = char and char:FindFirstChild('HumanoidRootPart')
+    return root ~= nil and hum ~= nil and hum.Health > 0
 end
 
 local function refreshESP()
     if not cfg.esp then clearESP(); return end
     for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LP then
-            local ch = p.Character
-            if highlights[p] and (not ch or highlights[p].Adornee ~= ch) then
-                highlights[p]:Destroy()
-                highlights[p] = nil
+        local ch = p.Character
+        local enemy = validEnemy(p)
+        if not enemy then
+            if highlights[p] then highlights[p]:Destroy(); highlights[p] = nil end
+            if tpTags[p] then tpTags[p]:Destroy(); tpTags[p] = nil end
+        else
+            if highlights[p] and highlights[p].Adornee ~= ch then
+                highlights[p]:Destroy(); highlights[p] = nil
             end
-            if ch and not highlights[p] then
+            if not highlights[p] then
                 local h = Instance.new('Highlight')
                 h.Name = 'SatisHub_Anime_ESP'
                 h.Adornee = ch
@@ -620,11 +787,86 @@ local function refreshESP()
                 h.Parent = gui
                 highlights[p] = h
             end
+            local head = ch:FindFirstChild('Head') or ch:FindFirstChild('HumanoidRootPart')
+            local tag = tpTags[p]
+            if (not cfg.tpEnemy) or (not head) then
+                if tag then tag:Destroy(); tpTags[p] = nil end
+            elseif tag and tag.Adornee ~= head then
+                tag:Destroy(); tpTags[p] = nil
+            end
+            if cfg.tpEnemy and head and not tpTags[p] then
+                local bb = Instance.new('BillboardGui')
+                bb.Name = 'SatisHub_TP_Hint'
+                bb.Adornee = head
+                bb.Size = UDim2.fromOffset(170, 36)
+                bb.StudsOffsetWorldSpace = Vector3.new(0, 3, 0)
+                bb.AlwaysOnTop = true
+                bb.MaxDistance = 1000
+                bb.Parent = gui
+                local hint = Instance.new('TextLabel')
+                hint.Name = 'Hint'
+                hint.Size = UDim2.fromScale(1, 1)
+                hint.BackgroundColor3 = Color3.fromRGB(14, 12, 9)
+                hint.BackgroundTransparency = 0.22
+                hint.TextColor3 = GOLD
+                hint.TextStrokeTransparency = 0.45
+                hint.Font = Enum.Font.GothamBold
+                hint.TextSize = 13
+                hint.Text = 'Press U to Teleport'
+                hint.ZIndex = 10
+                hint.Parent = bb
+                rounded(hint, 9)
+                stroke(hint, GOLD_DARK, 1, 0.2)
+                tpTags[p] = bb
+            end
         end
     end
     for p, obj in pairs(highlights) do
         if not p.Parent then obj:Destroy(); highlights[p] = nil end
     end
+    for p, obj in pairs(tpTags) do
+        if not p.Parent then obj:Destroy(); tpTags[p] = nil end
+    end
+end
+
+-- Press U to teleport behind the enemy nearest to the center of the screen.
+-- This is a local movement request; server validation can undo the move.
+local lastTp = 0
+local function tpToEnemy()
+    if not cfg.tpEnemy or not cfg.esp then return end
+    if os.clock() - lastTp < 1 then return end
+    local character = LP.Character
+    local localRoot = character and character:FindFirstChild('HumanoidRootPart')
+    local cam = workspace.CurrentCamera
+    if not localRoot or not cam then return end
+    local center = cam.ViewportSize / 2
+    local bestPlayer = nil
+    local bestScore = math.huge
+    for _, p in ipairs(Players:GetPlayers()) do
+        if validEnemy(p) then
+            local theirRoot = p.Character:FindFirstChild('HumanoidRootPart')
+            local projected, visible = cam:WorldToViewportPoint(theirRoot.Position)
+            if visible and projected.Z > 0 then
+                local delta = Vector2.new(projected.X, projected.Y) - center
+                local score = delta.Magnitude
+                if score < bestScore then
+                    bestPlayer = p
+                    bestScore = score
+                end
+            end
+        end
+    end
+    if not bestPlayer then
+        if statusText then statusText.Text = '●  TP: no visible enemy' end
+        return
+    end
+    local enemyRoot = bestPlayer.Character and bestPlayer.Character:FindFirstChild('HumanoidRootPart')
+    if not enemyRoot then return end
+    lastTp = os.clock()
+    local behind = enemyRoot.CFrame * CFrame.new(0, 0, 4)
+    local destination = CFrame.lookAt(behind.Position, enemyRoot.Position)
+    character:PivotTo(destination)
+    if statusText then statusText.Text = '●  TP behind ' .. bestPlayer.Name end
 end
 
 local function chooseTarget(cam)
@@ -808,12 +1050,13 @@ bind(UIS.InputEnded, function(input) if input.UserInputType == Enum.UserInputTyp
 
 bind(UIS.InputBegan, function(input, processed)
     if processed or UIS:GetFocusedTextBox() then return end
+    if input.KeyCode == Enum.KeyCode.U then
+        tpToEnemy()
+        return
+    end
     if input.KeyCode == Enum.KeyCode.RightShift then
         if miniBar.Visible then
-            miniBar.Visible = false
-            main.Visible = true
-            main.Position = UDim2.fromScale(0.5, 0.52)
-            tween(main, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = UDim2.fromScale(0.5, 0.5)})
+            restoreWindow()
         else
             if main.Visible then
                 tween(main, TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Position = UDim2.fromScale(0.5, 0.54)})
@@ -827,15 +1070,11 @@ bind(UIS.InputBegan, function(input, processed)
     end
 end)
 
-currentPage = 'Combat'
-for tabName, page in pairs(pages) do
-    page.Visible = (tabName == 'Combat')
-    page.Position = pagePositions.base
-    page.BackgroundTransparency = 0.95
-end
-navButtons.Combat.BackgroundColor3 = Color3.fromRGB(111, 72, 15)
-navButtons.Combat.TextColor3 = GOLD
-navButtons.Combat:SetAttribute('RestColor', navButtons.Combat.BackgroundColor3)
+-- Start minimized: show only the SH icon when the script loads.
+showPage('Combat', true)
+main.Visible = false
+miniBar.Visible = true
+miniBar.Size = iconSize
 saveSettings()
 
 env.SatisHubAnimeCleanup = function()
@@ -848,4 +1087,4 @@ env.SatisHubAnimeCleanup = function()
     gui:Destroy()
 end
 
-print('[SatisHub] MD V4.5 loaded; tabs: Combat, Visuals, Movement, Settings; mouse mode locked.')
+print('[SatisHub] MD V4.9 loaded; tabs: Combat, Visuals, Movement, Settings; mouse mode locked.')
