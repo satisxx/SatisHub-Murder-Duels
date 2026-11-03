@@ -111,7 +111,16 @@ local function restoreCollision()
     table.clear(original)
 end
 -- Combat
-local aimStatus=text(pages.Combat,'Hold RMB to aim. The game's camera may override aim.',UDim2.new(1,-10,0,37),UDim2.new(),11,MUTED)
+
+local aimStatus = text(
+    pages.Combat,
+    "Hold RMB to aim. The game's camera may override aim.",
+    UDim2.new(1, -10, 0, 37),
+    UDim2.new(),
+    11,
+    MUTED
+)
+
 aimStatus.TextWrapped=true;aimStatus.ZIndex=7
 toggle(pages.Combat,'Aimbot (hold right mouse)','aim')
 stepper(pages.Combat,'FOV radius','fov',30,550,20,'%d px')
