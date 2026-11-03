@@ -555,7 +555,7 @@ end
 applyImage()
 
 -- Gold header and custom image icons in sidebar.
-local sidebar = frame(main, 0, 0, 218, 650, BG, 8, 0.12)
+local sidebar = frame(main, 0, 0, 218, 650, Color3.fromRGB(5, 6, 10), 8, 0)
 stroke(sidebar, Color3.fromRGB(90, 65, 18), 1, 0.6)
 local sideDivider = frame(main, 217, 0, 2, 650, GOLD, 9, 0.40)
 -- V5.7: fantasy-style gold wordmark with a deep offset shadow.
@@ -715,7 +715,7 @@ local statusStrip = frame(main, 237, 597, 802, 35, BG, 12, 0.27)
 rounded(statusStrip, 9)
 stroke(statusStrip, GOLD_DARK, 1, 0.20)
 statusText = label(statusStrip, '●  SATISHUB READY', 16, 2, 540, 31, 12, GREEN, Enum.Font.GothamBold, 13)
-local versionText = label(statusStrip, 'Murder Duels   •   V5.8', 573, 2, 208, 31, 12, MUTED, Enum.Font.GothamBold, 13)
+local versionText = label(statusStrip, 'Murder Duels   •   V6.0', 573, 2, 208, 31, 12, MUTED, Enum.Font.GothamBold, 13)
 versionText.TextXAlignment = Enum.TextXAlignment.Right
 
 local pageNames = {'Combat', 'Visuals', 'Movement', 'Settings'}
@@ -735,14 +735,8 @@ local iconSources = {
     Movement = getLocalImage('SatisHub_Tab_Movement.png', 'SatisHub_Icon_Movement_Embedded.png', ICON_MOVEMENT_B64),
     Settings = getLocalImage('SatisHub_Tab_Settings.png', 'SatisHub_Icon_Settings_Embedded.png', ICON_SETTINGS_B64),
 }
-local iconFallback = {Combat='⚔', Visuals='◉', Movement='➤', Settings='⚙'}
-local navEmoji = {Combat = '🎯', Visuals = '👁', Movement = '⚡', Settings = '⚙'}
-local function navIcon(root, kind)
-    local pic = label(root, navEmoji[kind] or '✦', 0, 0, 26, 26, 20, GOLD, Enum.Font.GothamBold, 13)
-    pic.TextXAlignment = Enum.TextXAlignment.Center
-    return pic
-end
-
+-- V6.0: clean typographic navigation; no emoji or icon tiles.
+local navTextLabels = {}
 for i, name in ipairs(pageNames) do
     local y = 249 + (i - 1) * 65
     local nav = makeButton(sidebar, '', 20, y, 180, 52, function()
@@ -750,13 +744,48 @@ for i, name in ipairs(pageNames) do
     end)
     nav.Text = ''
     nav.BackgroundTransparency = 0.21
-    local iconTile = frame(nav, 12, 13, 26, 26, BG, 11, 1)
-    navIcon(iconTile, name)
-    label(nav, name, 46, 0, 130, 52, 15, WHITE, Enum.Font.GothamBold, 12)
+    -- Soft offset shadow gives the same raised, fantasy style as SatisHub.
+    local shadow = label(nav, name, 22, 3, 156, 46, 23,
+        Color3.fromRGB(95, 52, 6), Enum.Font.Fantasy, 12)
+    shadow.TextStrokeColor3 = Color3.fromRGB(24, 14, 4)
+    shadow.TextStrokeTransparency = 0.2
+    local title = label(nav, name, 20, 0, 156, 48, 23,
+        GOLD, Enum.Font.Fantasy, 13)
+    title.TextStrokeColor3 = Color3.fromRGB(255, 170, 14)
+    title.TextStrokeTransparency = 0.43
+    local grad = Instance.new('UIGradient')
+    grad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 249, 191)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 210, 67)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(219, 142, 15)),
+    })
+    grad.Rotation = 90
+    grad.Parent = title
+    navTextLabels[name] = {title = title, shadow = shadow}
     navButtons[name] = nav
 end
-label(sidebar, 'RIGHT SHIFT  •  MENU', 18, 579, 187, 21, 10, MUTED, Enum.Font.GothamBold, 11)
-label(sidebar, 'MD / BLUE & RED', 20, 608, 186, 18, 11, GOLD, Enum.Font.GothamBold, 11)
+-- Executor indicator: use a reported name when the runtime exposes one.
+-- Never assume the executor from a UI screenshot or a hard-coded value.
+local function detectExecutor()
+    for _, detector in ipairs({
+        type(identifyexecutor) == 'function' and identifyexecutor or false,
+        type(getexecutorname) == 'function' and getexecutorname or false,
+    }) do
+        if type(detector) == 'function' then
+            local ok, name = pcall(detector)
+            if ok and type(name) == 'string' and name:match('%S') then
+                return name
+            end
+        end
+    end
+    return 'Unknown Executor'
+end
+
+local executorName = detectExecutor()
+local executorTitle = label(sidebar, 'EXECUTOR', 18, 581, 182, 19, 10, MUTED, Enum.Font.GothamBold, 11)
+local executorLabel = label(sidebar, executorName, 18, 602, 184, 25, 13, GOLD, Enum.Font.GothamBold, 11)
+executorLabel.TextTruncate = Enum.TextTruncate.AtEnd
+executorLabel.TextWrapped = false
 
 -- CanvasGroup also animates text and buttons.
 for _, name in ipairs(pageNames) do
@@ -788,6 +817,11 @@ showPage = function(name, instant)
         local rest = active and Color3.fromRGB(95, 62, 13) or PANEL2
         b:SetAttribute('RestColor', rest)
         tween(b, TweenInfo.new(0.18, Enum.EasingStyle.Quart), {BackgroundColor3 = rest})
+        local names = navTextLabels[key]
+        if names then
+            tween(names.title, TweenInfo.new(0.18), {TextStrokeTransparency = active and 0.12 or 0.48})
+            tween(names.shadow, TweenInfo.new(0.18), {TextTransparency = active and 0 or 0.2})
+        end
     end
     if instant or old == nil then
         for key, page in pairs(pages) do
