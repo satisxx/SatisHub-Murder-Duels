@@ -465,6 +465,16 @@ gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 gui.Parent = PG
 
 -- The opaque menu uses a full-size background image.
+-- External luminous border, not clipped by the main window.
+local outerGlow = frame(gui, 0, 0, 1070, 660, BG, 1, 1)
+outerGlow.AnchorPoint = Vector2.new(0.5, 0.5)
+outerGlow.Position = UDim2.fromScale(0.5, 0.5)
+rounded(outerGlow, 24)
+local halo = stroke(outerGlow, GOLD, 11, 0.80)
+local haloEdge = stroke(outerGlow, GOLD, 5, 0.44)
+local glowScale = Instance.new('UIScale')
+glowScale.Parent = outerGlow
+TweenService:Create(halo, TweenInfo.new(2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {Transparency = 0.55}):Play()
 main = frame(gui, 0, 0, 1060, 650, BG, 3, 0)
 main.AnchorPoint = Vector2.new(0.5, 0.5)
 main.Position = UDim2.fromScale(0.5, 0.5)
@@ -485,8 +495,11 @@ local function updateWindowScale()
     local camera = workspace.CurrentCamera
     local size = camera and camera.ViewportSize or Vector2.new(1600, 900)
     windowScale.Scale = math.min(1, (size.X - 36) / 1060, (size.Y - 36) / 650)
+    glowScale.Scale = windowScale.Scale
 end
 updateWindowScale()
+bind(main:GetPropertyChangedSignal('Position'), function() outerGlow.Position = main.Position end)
+bind(main:GetPropertyChangedSignal('Visible'), function() outerGlow.Visible = main.Visible end)
 local shine = TweenService:Create(mainBorder, TweenInfo.new(2.1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {Transparency=0.26})
 shine:Play()
 
@@ -589,38 +602,32 @@ local MD_NOFRAME_B64 = table.concat({
     'sAf4eihzqTt3KLB7hxJ25oXYQLHfjWUqRyk72koSTSotDRnOzL4Y82sW3QEYXJJSs+pOs9qHRgHxcj5Xbuy+HKAvl4FXmiNQ6VpTQF/nxVyOyw7KuJ/v38YqL77BJKcU2yQMZ5Cvpu6Uo0f5NhPNojvNuEFsJfvQTMy+XKAvlWHTIF9XAN+kQF/pYoYiC7XcXtU4RIuq3NhUpe6q4arE1dCdUgx/PXWnkG4MB91pJfvQbGBfySagGq+Vq6sK3JsA6EtZXJUa71L+TqXnopxkl8EmrRRiY0qZixtmVLrT9BvEZrMPjQLg1QT4cuxPOTpHg/z7yh42EdCXs3svtlBLXbxYowU4mLiTKg1RuqN0p7WucTOw/MHW41cC8oPRVWUDmwjoS1nMpS7UetfAVjOZRTF5pTtKd1rrGjcL4FcKsNUA8OEwhnvYAn2lC7rUHTlW8TxUOtt7qF1XSo/rpzulvk/pTuvbh0YA6aH4e9X2BlRr06GkCYG+2PcZzKLFOi/EwRpkpezV1Z1S9UnpjrIPw5HRD8VmoNp/S0kTA32lRrsRduaV7npVHErpjtKd1r/GzewNoCH+d5SdG6ZAX853a6QFXM0FoZRf6Y7Snda6xs0O+NX6G8q2KaCvyvfEJl5YahEo3VG6M3yucSttAJQ+KqBX310tBqU7SnfUNVabAyVqMbT+71CLQ+mO0h11jZWeKVELoEl+u1oQSn+U7qjrq0BZiRIlSpQoUaJEiRIlSpQoUaJEiRIlSpQoUaJEiRIlSpQoUaJEiRIlSpQoUaJEiRIlSpQoUaJEiRIlSpQoUaJEiRIlSpQoUaKkRvL/Awmlgk9tlcV/AAAAAElFTkSuQmCC',
 })
 
-local mdOrbit = frame(sidebar, 25, 112, 166, 102, BG, 9, 1)
--- No outline or frame: the logo floats against the sidebar.
-local logoAura = Instance.new('ImageLabel')
-logoAura.Name = 'MDGlow'
-logoAura.BackgroundTransparency = 1
-logoAura.Position = UDim2.fromOffset(-9, -7)
-logoAura.Size = UDim2.new(1, 18, 1, 14)
-logoAura.ImageTransparency = 0.72
-logoAura.ZIndex = 10
-logoAura.ScaleType = Enum.ScaleType.Fit
-logoAura.Parent = mdOrbit
-local mdImage = Instance.new('ImageLabel')
-mdImage.Name = 'MDLogo3D'
-mdImage.BackgroundTransparency = 1
-mdImage.Size = UDim2.new(1, 0, 1, 0)
-mdImage.ScaleType = Enum.ScaleType.Fit
-mdImage.ZIndex = 13
-mdImage.Parent = mdOrbit
-local rgbSource = getLocalImage('SatisHub_MD_V5_5_Logo_NoFrame.png', 'SatisHub_MD_V5_5_Logo_NoFrame_Embedded.png', MD_NOFRAME_B64)
-if rgbSource then
-    mdImage.Image = rgbSource
-    logoAura.Image = rgbSource
-else
-    mdImage.Visible = false
-    logoAura.Visible = false
-    for off = 7, 1, -1 do
-        label(mdOrbit, 'M', 22+off, 4+off, 84, 90, 65, Color3.fromRGB(9, 41, 119), Enum.Font.GothamBlack, 11).TextXAlignment = Enum.TextXAlignment.Center
-        label(mdOrbit, 'D', 83+off, 4+off, 84, 90, 65, Color3.fromRGB(114, 11, 24), Enum.Font.GothamBlack, 11).TextXAlignment = Enum.TextXAlignment.Center
+-- Guaranteed, borderless 3D MD made of native Roblox text (no image asset needed).
+local mdOrbit = frame(sidebar, 26, 115, 166, 100, BG, 9, 1)
+local function letter3D(letter, x, blue)
+    local shadow = blue and Color3.fromRGB(5, 36, 92) or Color3.fromRGB(88, 9, 19)
+    local bright = blue and Color3.fromRGB(62, 167, 255) or Color3.fromRGB(255, 60, 79)
+    local pale = blue and Color3.fromRGB(173, 229, 255) or Color3.fromRGB(255, 167, 176)
+    local aura = label(mdOrbit, letter, x-3, -5, 88, 104, 80, bright, Enum.Font.GothamBlack, 10)
+    aura.TextTransparency = 0.78
+    aura.TextXAlignment = Enum.TextXAlignment.Center
+    for layer = 7, 1, -1 do
+        local depth = label(mdOrbit, letter, x+layer, layer, 88, 91, 74, shadow, Enum.Font.GothamBlack, 11)
+        depth.TextXAlignment = Enum.TextXAlignment.Center
     end
-    label(mdOrbit, 'M', 22, 4, 84, 90, 65, Color3.fromRGB(32, 143, 255), Enum.Font.GothamBlack, 12).TextXAlignment = Enum.TextXAlignment.Center
-    label(mdOrbit, 'D', 83, 4, 84, 90, 65, Color3.fromRGB(255, 48, 65), Enum.Font.GothamBlack, 12).TextXAlignment = Enum.TextXAlignment.Center
+    local face = label(mdOrbit, letter, x, 0, 88, 91, 74, bright, Enum.Font.GothamBlack, 13)
+    face.TextXAlignment = Enum.TextXAlignment.Center
+    local gradient = Instance.new('UIGradient')
+    gradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, pale),
+        ColorSequenceKeypoint.new(0.38, bright),
+        ColorSequenceKeypoint.new(1, shadow),
+    })
+    gradient.Rotation = 90
+    gradient.Parent = face
 end
+letter3D('M', 3, true)
+letter3D('D', 84, false)
 
 local pageTitle = label(main, 'COMBAT', 240, 24, 400, 45, 30, WHITE, Enum.Font.GothamBlack, 12)
 local pageSubtitle = label(main, 'MELIODAS  /  BLACK & GOLD', 242, 72, 500, 28, 13, GOLD, Enum.Font.GothamBold, 12)
@@ -694,7 +701,7 @@ local statusStrip = frame(main, 237, 597, 802, 35, BG, 12, 0.27)
 rounded(statusStrip, 9)
 stroke(statusStrip, GOLD_DARK, 1, 0.20)
 statusText = label(statusStrip, '●  SATISHUB READY', 16, 2, 540, 31, 12, GREEN, Enum.Font.GothamBold, 13)
-local versionText = label(statusStrip, 'Murder Duels   •   V5.5', 573, 2, 208, 31, 12, MUTED, Enum.Font.GothamBold, 13)
+local versionText = label(statusStrip, 'Murder Duels   •   V5.6', 573, 2, 208, 31, 12, MUTED, Enum.Font.GothamBold, 13)
 versionText.TextXAlignment = Enum.TextXAlignment.Right
 
 local pageNames = {'Combat', 'Visuals', 'Movement', 'Settings'}
@@ -715,21 +722,13 @@ local iconSources = {
     Settings = getLocalImage('SatisHub_Tab_Settings.png', 'SatisHub_Icon_Settings_Embedded.png', ICON_SETTINGS_B64),
 }
 local iconFallback = {Combat='⚔', Visuals='◉', Movement='➤', Settings='⚙'}
+local navEmoji = {Combat = '🎯', Visuals = '👁', Movement = '⚡', Settings = '⚙'}
 local function navIcon(root, kind)
-    local image = Instance.new('ImageLabel')
-    image.BackgroundTransparency = 1
-    image.Size = UDim2.fromOffset(26, 26)
-    image.Position = UDim2.new(0.5, -13, 0.5, -13)
-    image.ScaleType = Enum.ScaleType.Fit
-    image.ZIndex = 13
-    image.Image = iconSources[kind] or ''
-    image.Visible = iconSources[kind] ~= nil
-    image.Parent = root
-    if not iconSources[kind] then
-        local fallback = label(root, iconFallback[kind] or '•', 0, 0, 32, 32, 22, GOLD, Enum.Font.GothamBold, 13)
-        fallback.TextXAlignment = Enum.TextXAlignment.Center
-    end
+    local pic = label(root, navEmoji[kind] or '✦', 0, 0, 26, 26, 20, GOLD, Enum.Font.GothamBold, 13)
+    pic.TextXAlignment = Enum.TextXAlignment.Center
+    return pic
 end
+
 for i, name in ipairs(pageNames) do
     local y = 249 + (i - 1) * 65
     local nav = makeButton(sidebar, '', 20, y, 180, 52, function()
@@ -737,9 +736,9 @@ for i, name in ipairs(pageNames) do
     end)
     nav.Text = ''
     nav.BackgroundTransparency = 0.21
-    local iconTile = frame(nav, 13, 10, 32, 32, BG, 11, 1)
+    local iconTile = frame(nav, 12, 13, 26, 26, BG, 11, 1)
     navIcon(iconTile, name)
-    label(nav, name, 55, 0, 120, 52, 15, WHITE, Enum.Font.GothamBold, 12)
+    label(nav, name, 46, 0, 130, 52, 15, WHITE, Enum.Font.GothamBold, 12)
     navButtons[name] = nav
 end
 label(sidebar, 'RIGHT SHIFT  •  MENU', 18, 579, 187, 21, 10, MUTED, Enum.Font.GothamBold, 11)
@@ -1504,7 +1503,8 @@ env.SatisHubAnimeCleanup = function()
     visualOverlay:Destroy()
     pcall(function() RunService:UnbindFromRenderStep(renderKey) end)
     for _, c in ipairs(connections) do c:Disconnect() end
+    outerGlow:Destroy()
     gui:Destroy()
 end
 
-print('[SatisHub] MD V5.5 loaded. Rainbow ESP and Discord welcome enabled.')
+print('[SatisHub] MD V5.6 loaded. Rainbow ESP and Discord welcome enabled.')
