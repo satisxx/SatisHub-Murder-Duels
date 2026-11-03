@@ -558,7 +558,21 @@ applyImage()
 local sidebar = frame(main, 0, 0, 218, 650, BG, 8, 0.12)
 stroke(sidebar, Color3.fromRGB(90, 65, 18), 1, 0.6)
 local sideDivider = frame(main, 217, 0, 2, 650, GOLD, 9, 0.40)
-label(sidebar, 'SatisHub', 23, 23, 175, 43, 28, PALE, Enum.Font.GothamBlack, 11)
+-- V5.7: fantasy-style gold wordmark with a deep offset shadow.
+local brandShadow = label(sidebar, 'SatisHub', 25, 26, 184, 47, 33, Color3.fromRGB(70, 39, 9), Enum.Font.Fantasy, 10)
+brandShadow.TextStrokeColor3 = Color3.fromRGB(10, 9, 12)
+brandShadow.TextStrokeTransparency = 0.45
+local brandTitle = label(sidebar, 'SatisHub', 22, 22, 184, 47, 33, GOLD, Enum.Font.Fantasy, 12)
+brandTitle.TextStrokeColor3 = Color3.fromRGB(20, 13, 6)
+brandTitle.TextStrokeTransparency = 0.12
+local brandGradient = Instance.new('UIGradient')
+brandGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 251, 221)),
+    ColorSequenceKeypoint.new(0.48, Color3.fromRGB(255, 207, 76)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(197, 122, 20)),
+})
+brandGradient.Rotation = 90
+brandGradient.Parent = brandTitle
 label(sidebar, 'MURDER DUELS  •  1V1', 25, 69, 171, 25, 11, MUTED, Enum.Font.GothamBold, 11)
 
 -- 3D emblem with blue M and red D.
@@ -627,7 +641,7 @@ local function letter3D(letter, x, blue)
     gradient.Parent = face
 end
 letter3D('M', 3, true)
-letter3D('D', 84, false)
+letter3D('D', 63, false)
 
 local pageTitle = label(main, 'COMBAT', 240, 24, 400, 45, 30, WHITE, Enum.Font.GothamBlack, 12)
 local pageSubtitle = label(main, 'MELIODAS  /  BLACK & GOLD', 242, 72, 500, 28, 13, GOLD, Enum.Font.GothamBold, 12)
@@ -701,7 +715,7 @@ local statusStrip = frame(main, 237, 597, 802, 35, BG, 12, 0.27)
 rounded(statusStrip, 9)
 stroke(statusStrip, GOLD_DARK, 1, 0.20)
 statusText = label(statusStrip, '●  SATISHUB READY', 16, 2, 540, 31, 12, GREEN, Enum.Font.GothamBold, 13)
-local versionText = label(statusStrip, 'Murder Duels   •   V5.6', 573, 2, 208, 31, 12, MUTED, Enum.Font.GothamBold, 13)
+local versionText = label(statusStrip, 'Murder Duels   •   V5.8', 573, 2, 208, 31, 12, MUTED, Enum.Font.GothamBold, 13)
 versionText.TextXAlignment = Enum.TextXAlignment.Right
 
 local pageNames = {'Combat', 'Visuals', 'Movement', 'Settings'}
@@ -1037,8 +1051,7 @@ local function refreshESP()
                 local hint = Instance.new('TextLabel')
                 hint.Name = 'Hint'
                 hint.Size = UDim2.fromScale(1, 1)
-                hint.BackgroundColor3 = Color3.fromRGB(14, 12, 9)
-                hint.BackgroundTransparency = 0.32
+                hint.BackgroundTransparency = 1
                 hint.TextColor3 = GOLD
                 hint.TextStrokeTransparency = 0.45
                 hint.Font = Enum.Font.GothamBold
@@ -1046,8 +1059,7 @@ local function refreshESP()
                 hint.Text = '[U] Teleport'
                 hint.ZIndex = 10
                 hint.Parent = bb
-                rounded(hint, 6)
-                stroke(hint, GOLD_DARK, 1, 0.2)
+                -- Text only: no panel, rounded frame or border.
                 tpTags[p] = bb
             end
         end
@@ -1285,6 +1297,15 @@ bind(RunService.Heartbeat, function(dt)
             highlight.OutlineColor = cfg.rainbowESP and espAnimatedColor or WHITE
         end
     end
+    -- Keep teleport text synchronized with the ESP colour effect.
+    for _, tag in pairs(tpTags) do
+        if tag and tag.Parent then
+            local hint = tag:FindFirstChild('Hint')
+            if hint then
+                hint.TextColor3 = (cfg.rainbowESP and cfg.esp) and espAnimatedColor or GOLD
+            end
+        end
+    end
     for _, marker in pairs(extraESP) do
         if marker.box and marker.box.Parent then
             local border = marker.box:FindFirstChildOfClass('UIStroke')
@@ -1507,4 +1528,4 @@ env.SatisHubAnimeCleanup = function()
     gui:Destroy()
 end
 
-print('[SatisHub] MD V5.6 loaded. Rainbow ESP and Discord welcome enabled.')
+print('[SatisHub] MD V5.7 loaded. Rainbow ESP and Discord welcome enabled.')
